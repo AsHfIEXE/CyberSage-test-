@@ -15,7 +15,7 @@ import json
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-class EnhancedVulnerabilityScanner:
+class VulnerabilityScanner:
     """
     Professional vulnerability scanner with detailed evidence collection
     """
