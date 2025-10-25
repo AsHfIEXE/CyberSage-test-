@@ -25,6 +25,9 @@ const CyberSageApp = () => {
   const [stats, setStats] = useState({ critical: 0, high: 0, medium: 0, low: 0 });
   const [aiInsights, setAiInsights] = useState([]);
   const [httpHistory, setHttpHistory] = useState([]);
+  
+  // Persistent logs state (survives tab changes)
+  const [persistentLogs, setPersistentLogs] = useState([]);
 
   // WebSocket setup
   useEffect(() => {
@@ -335,9 +338,14 @@ const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPh
       </div>
     )}
 
-    {/* Real-Time Logs */}
-    {scanStatus === 'running' && socket && (
-      <RealTimeLogs socket={socket} scanId={currentScanId} />
+    {/* Real-Time Logs - Persistent across tab changes */}
+    {socket && (
+      <RealTimeLogs 
+        socket={socket} 
+        scanId={currentScanId} 
+        logs={persistentLogs}
+        setLogs={setPersistentLogs}
+      />
     )}
   </div>
 );

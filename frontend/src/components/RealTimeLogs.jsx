@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const RealTimeLogs = ({ socket, scanId }) => {
-  const [logs, setLogs] = useState([]);
+const RealTimeLogs = ({ socket, scanId, logs: externalLogs, setLogs: setExternalLogs }) => {
+  // Use external logs if provided, otherwise use internal state
+  const [internalLogs, setInternalLogs] = useState([]);
+  const logs = externalLogs !== undefined ? externalLogs : internalLogs;
+  const setLogs = setExternalLogs !== undefined ? setExternalLogs : setInternalLogs;
+  
   const [autoScroll, setAutoScroll] = useState(true);
   const [filter, setFilter] = useState('all'); // all, info, warning, error
   const [connectionStatus, setConnectionStatus] = useState('connected');
