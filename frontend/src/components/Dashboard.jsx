@@ -81,9 +81,10 @@ const Dashboard = () => {
     });
 
     socket.on('vulnerability_found', (data) => {
+      // Use REAL database ID from backend (not fake temporary ID)
       const newVuln = {
-        ...data,
-        id: Date.now() + Math.random()
+        ...data
+        // Don't generate fake ID - backend sends real database ID
       };
       
       setVulnerabilities(prev => [newVuln, ...prev]);

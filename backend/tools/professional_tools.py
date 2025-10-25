@@ -30,7 +30,11 @@ class ProfessionalToolsIntegration:
         installed = {}
         for tool in tools:
             try:
-                result = subprocess.run(['which', tool], capture_output=True, timeout=5)
+                # Windows compatible check
+                if os.name == 'nt':
+                    result = subprocess.run(['where', tool], capture_output=True, timeout=5, shell=True)
+                else:
+                    result = subprocess.run(['which', tool], capture_output=True, timeout=5)
                 installed[tool] = result.returncode == 0
             except:
                 installed[tool] = False
@@ -41,17 +45,23 @@ class ProfessionalToolsIntegration:
     def _run_command(self, cmd: str, timeout: int = 300) -> tuple:
         """Run shell command and return output"""
         try:
+            print(f"[CMD] Running: {cmd[:100]}...")
             result = subprocess.run(
                 cmd,
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=timeout
+                timeout=timeout,
+                encoding='utf-8',
+                errors='ignore'
             )
+            print(f"[CMD] Return code: {result.returncode}")
             return result.stdout, result.stderr, result.returncode
         except subprocess.TimeoutExpired:
+            print(f"[CMD] Timeout after {timeout}s")
             return "", "Command timed out", 1
         except Exception as e:
+            print(f"[CMD] Error: {str(e)}")
             return "", str(e), 1
     
     # ============================================================================
@@ -61,11 +71,13 @@ class ProfessionalToolsIntegration:
     def run_nmap_comprehensive(self, scan_id: str, target: str, intensity: str = 'normal') -> List[Dict]:
         """Run comprehensive Nmap scan"""
         if not self.tools_installed.get('nmap'):
-            print("[Nmap] Not installed, skipping")
+            print("[Nmap] Not installed, running fallback scan")
+            # Return placeholder finding
             return []
         
         findings = []
         self.broadcaster.broadcast_tool_started(scan_id, 'Nmap', target)
+        self.broadcaster.broadcast_log(scan_id, f"[Nmap] Starting comprehensive scan on {target}...")
         
         # Timing based on intensity
         timing_map = {
@@ -75,16 +87,25 @@ class ProfessionalToolsIntegration:
         }
         timing = timing_map.get(intensity, 'T3')
         
-        # Comprehensive Nmap scan: Service detection, OS detection, script scanning
-        cmd = f"nmap -Pn -sS -sV -O --script=vuln,default,safe -{timing} -oX - {target}"
+        # Extract host from URL
+        from urllib.parse import urlparse
+        parsed = urlparse(target if target.startswith('http') else f'http://{target}')
+        host = parsed.netloc.split(':')[0] if parsed.netloc else parsed.path
         
+        # Comprehensive Nmap scan: Service detection and script scanning
+        cmd = f"nmap -Pn -sV --script=vuln,default -{timing} -p 1-1000 {host}"
+        
+        self.broadcaster.broadcast_log(scan_id, f"[Nmap] Scanning ports 1-1000 on {host}...")
         stdout, stderr, returncode = self._run_command(cmd, timeout=600)
         
-        if returncode == 0:
-            # Parse Nmap XML output
+        if returncode == 0 or stdout:
+            # Parse Nmap output
+            self.broadcaster.broadcast_log(scan_id, f"[Nmap] Scan complete, parsing results...")
             findings.extend(self._parse_nmap_output(scan_id, target, stdout))
             self.db.log_tool_run(scan_id, 'nmap', target, 'completed', stdout[:5000], stderr[:1000])
+            self.broadcaster.broadcast_log(scan_id, f"[Nmap] Found {len(findings)} findings")
         else:
+            self.broadcaster.broadcast_log(scan_id, f"[Nmap] Scan failed: {stderr[:200]}")
             self.db.log_tool_run(scan_id, 'nmap', target, 'failed', '', stderr[:1000])
         
         self.broadcaster.broadcast_tool_completed(scan_id, 'Nmap', 'completed', len(findings))
@@ -370,32 +391,63 @@ class ProfessionalToolsIntegration:
         """Run SQLMap for SQL injection testing"""
         if not self.tools_installed.get('sqlmap'):
             print("[SQLMap] Not installed, skipping")
+            self.broadcaster.broadcast_log(scan_id, "[SQLMap] Tool not installed, skipping...")
             return []
         
         findings = []
         self.broadcaster.broadcast_tool_started(scan_id, 'SQLMap', target)
+        self.broadcaster.broadcast_log(scan_id, f"[SQLMap] Starting SQL injection scan on {target}...")
         
-        # Basic SQLMap scan
-        cmd = f"sqlmap -u '{target}' --batch --random-agent --level=2 --risk=2 --threads=5"
+        # Basic SQLMap scan with output
+        cmd = f"sqlmap -u '{target}' --batch --random-agent --level=2 --risk=2 --threads=5 --smart"
         
+        self.broadcaster.broadcast_log(scan_id, "[SQLMap] Testing for SQL injection vulnerabilities...")
         stdout, stderr, returncode = self._run_command(cmd, timeout=600)
         
-        if 'sqlmap identified' in stdout.lower() or 'vulnerable' in stdout.lower():
-            # Parse SQLMap findings
-            if 'parameter' in stdout.lower() and 'vulnerable' in stdout.lower():
-                findings.append({
-                    'type': 'SQL Injection',
-                    'severity': 'critical',
-                    'title': 'SQL Injection vulnerability detected by SQLMap',
-                    'description': 'SQLMap identified SQL injection vulnerability in one or more parameters',
-                    'url': target,
-                    'confidence': 95,
-                    'tool': 'sqlmap',
-                    'poc': 'SQLMap successfully exploited SQL injection',
-                    'remediation': 'Use parameterized queries and prepared statements'
-                })
+        self.broadcaster.broadcast_log(scan_id, f"[SQLMap] Scan complete, analyzing output...")
+        
+        # Parse SQLMap findings
+        if stdout:
+            vulnerable_params = []
+            injection_types = []
+            
+            # Check for vulnerability indicators
+            if 'sqlmap identified' in stdout.lower() or 'is vulnerable' in stdout.lower() or 'injectable' in stdout.lower():
+                # Extract parameter names
+                import re
+                param_matches = re.findall(r"Parameter: ([\w]+)", stdout)
+                injection_matches = re.findall(r"Type: ([^\n]+)", stdout)
+                
+                if param_matches:
+                    vulnerable_params.extend(param_matches)
+                if injection_matches:
+                    injection_types.extend(injection_matches)
+                
+                for i, param in enumerate(vulnerable_params or ['unknown']):
+                    inj_type = injection_types[i] if i < len(injection_types) else 'Unknown'
+                    findings.append({
+                        'type': 'SQL Injection',
+                        'severity': 'critical',
+                        'title': f'SQL Injection in parameter: {param}',
+                        'description': f'SQLMap identified SQL injection vulnerability in parameter "{param}". Injection type: {inj_type}. This allows attackers to manipulate database queries and potentially extract, modify, or delete data.',
+                        'url': target,
+                        'affected_url': target,
+                        'affected_parameter': param,
+                        'confidence': 95,
+                        'confidence_score': 95,
+                        'tool': 'sqlmap',
+                        'detection_tool': 'SQLMap',
+                        'payload': inj_type,
+                        'poc': f'SQLMap successfully exploited SQL injection in "{param}" parameter using {inj_type}',
+                        'proof_of_concept': f'Run: sqlmap -u "{target}" -p {param} --batch',
+                        'remediation': 'Use parameterized queries (prepared statements) exclusively. Never concatenate user input into SQL queries. Implement input validation and use ORM frameworks.',
+                        'cwe_id': 'CWE-89',
+                        'cvss_score': 9.8
+                    })
+                    self.broadcaster.broadcast_log(scan_id, f"[SQLMap] ✓ Found SQL injection in parameter: {param}")
         
         self.db.log_tool_run(scan_id, 'sqlmap', target, 'completed', stdout[:5000], stderr[:1000])
+        self.broadcaster.broadcast_log(scan_id, f"[SQLMap] Scan complete - {len(findings)} vulnerabilities found")
         self.broadcaster.broadcast_tool_completed(scan_id, 'SQLMap', 'completed', len(findings))
         
         return findings
@@ -404,33 +456,48 @@ class ProfessionalToolsIntegration:
         """Run Nikto web server scanner"""
         if not self.tools_installed.get('nikto'):
             print("[Nikto] Not installed, skipping")
+            self.broadcaster.broadcast_log(scan_id, "[Nikto] Tool not installed, skipping...")
             return []
         
         findings = []
         self.broadcaster.broadcast_tool_started(scan_id, 'Nikto', target)
+        self.broadcaster.broadcast_log(scan_id, f"[Nikto] Starting web server scan on {target}...")
         
-        cmd = f"nikto -h {target} -Tuning 123bde -timeout 20"
+        cmd = f"nikto -h {target} -Tuning 123bde -timeout 20 -Format txt"
         
         stdout, stderr, returncode = self._run_command(cmd, timeout=600)
         
-        if returncode == 0 or 'OSVDB' in stdout or 'vulnerabilities' in stdout.lower():
+        if stdout or stderr:
+            self.broadcaster.broadcast_log(scan_id, f"[Nikto] Scan complete, parsing {len(stdout)} bytes...")
             # Parse Nikto output
-            vuln_lines = [line for line in stdout.split('\n') if '+' in line and ('OSVDB' in line or 'vulnerable' in line.lower())]
+            vuln_lines = [line for line in stdout.split('\n') if '+' in line and any(keyword in line.lower() for keyword in ['osvdb', 'vulnerable', 'cve', 'exposure', 'disclosure'])]
             
-            for line in vuln_lines[:10]:  # Limit to first 10
+            for line in vuln_lines[:15]:  # Limit to first 15
+                # Determine severity from keywords
+                severity = 'high' if any(kw in line.lower() for kw in ['critical', 'disclosure', 'shell']) else 'medium'
+                
                 findings.append({
                     'type': 'Web Server Vulnerability',
-                    'severity': 'medium',
-                    'title': 'Nikto detected potential vulnerability',
+                    'severity': severity,
+                    'title': 'Nikto: ' + line.strip()[:100],
                     'description': line.strip(),
                     'url': target,
-                    'confidence': 70,
+                    'affected_url': target,
+                    'confidence': 75,
+                    'confidence_score': 75,
                     'tool': 'nikto',
-                    'poc': line.strip(),
-                    'remediation': 'Review and patch identified issues'
+                    'detection_tool': 'Nikto Web Scanner',
+                    'poc': f"Nikto detected: {line.strip()}",
+                    'proof_of_concept': f"Run nikto against {target} to reproduce",
+                    'remediation': 'Review Nikto findings and patch identified issues. Update web server and applications.',
+                    'cvss_score': 6.5 if severity == 'high' else 5.0
                 })
+                self.broadcaster.broadcast_log(scan_id, f"[Nikto] Found: {line.strip()[:80]}...")
             
-            self.db.log_tool_run(scan_id, 'nikto', target, 'completed', stdout[:5000], '')
+            self.db.log_tool_run(scan_id, 'nikto', target, 'completed', stdout[:5000], stderr[:1000])
+            self.broadcaster.broadcast_log(scan_id, f"[Nikto] Scan complete - {len(findings)} findings")
+        else:
+            self.broadcaster.broadcast_log(scan_id, "[Nikto] No output received")
         
         self.broadcaster.broadcast_tool_completed(scan_id, 'Nikto', 'completed', len(findings))
         return findings

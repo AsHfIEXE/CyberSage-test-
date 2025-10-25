@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
+import DetailedVulnerabilityModal from './components/DetailedVulnerabilityModal';
+import RealTimeLogs from './components/RealTimeLogs';
+import ScanControlPanel from './components/ScanControlPanel';
 
 // ============================================================================
 // MAIN APP WITH PROPER NAVIGATION
@@ -125,7 +128,7 @@ const CyberSageApp = () => {
       case 'scanner':
         return <ScannerPage startScan={startScan} connected={connected} scanStatus={scanStatus} />;
       case 'vulnerabilities':
-        return <VulnerabilitiesPage vulnerabilities={vulnerabilities} />;
+        return <VulnerabilitiesPage vulnerabilities={vulnerabilities} currentScanId={currentScanId} />;
       case 'chains':
         return <ChainsPage chains={chains} />;
       case 'repeater':
@@ -149,6 +152,7 @@ const CyberSageApp = () => {
           currentScanId={currentScanId}
           aiInsights={aiInsights}
           toolActivity={toolActivity}
+          socket={socket}
         />;
     }
   };
@@ -224,23 +228,19 @@ const CyberSageApp = () => {
 // ============================================================================
 // DASHBOARD PAGE
 // ============================================================================
-const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPhase, chains, currentScanId, aiInsights, toolActivity }) => (
+const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPhase, chains, currentScanId, aiInsights, toolActivity, socket }) => (
   <div className="space-y-6">
     <h2 className="text-3xl font-bold">Security Dashboard</h2>
     
+    {/* Scan Control Panel */}
     {scanStatus === 'running' && (
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <div className="flex justify-between mb-3">
-          <span className="text-gray-300 font-medium">{currentPhase}</span>
-          <span className="text-purple-400 font-bold text-lg">{progress}%</span>
-        </div>
-        <div className="w-full bg-gray-800 rounded-full h-3">
-          <div 
-            className="h-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
-            style={{ width: `${Math.max(1, progress)}%` }}
-          />
-        </div>
-      </div>
+      <ScanControlPanel
+        socket={socket}
+        scanId={currentScanId}
+        scanStatus={scanStatus}
+        progress={progress}
+        currentPhase={currentPhase}
+      />
     )}
 
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -334,6 +334,11 @@ const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPh
         </div>
       </div>
     )}
+
+    {/* Real-Time Logs */}
+    {scanStatus === 'running' && socket && (
+      <RealTimeLogs socket={socket} scanId={currentScanId} />
+    )}
   </div>
 );
 
@@ -408,9 +413,11 @@ const ScannerPage = ({ startScan, connected, scanStatus }) => {
 // ============================================================================
 // VULNERABILITIES PAGE
 // ============================================================================
-const VulnerabilitiesPage = ({ vulnerabilities }) => {
+const VulnerabilitiesPage = ({ vulnerabilities, currentScanId }) => {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [selectedVuln, setSelectedVuln] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const filteredVulns = vulnerabilities.filter(v => {
     const matchesFilter = filter === 'all' || v.severity === filter;
@@ -419,10 +426,43 @@ const VulnerabilitiesPage = ({ vulnerabilities }) => {
     return matchesFilter && matchesSearch;
   });
 
+  const exportPDF = async () => {
+    if (!currentScanId) {
+      alert('No active scan to export');
+      return;
+    }
+    try {
+      const response = await fetch(`http://localhost:5000/api/scan/${currentScanId}/export/pdf`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cybersage-scan-${currentScanId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      alert('Failed to export PDF');
+    }
+  };
+
+  const handleVulnClick = (vuln) => {
+    setSelectedVuln(vuln);
+    setShowDetailModal(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-3xl font-bold">Vulnerabilities ({vulnerabilities.length})</h2>
+        {currentScanId && (
+          <button
+            onClick={exportPDF}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium"
+          >
+            📄 Export PDF Report
+          </button>
+        )}
       </div>
 
       <div className="flex gap-4">
@@ -448,12 +488,20 @@ const VulnerabilitiesPage = ({ vulnerabilities }) => {
 
       <div className="grid gap-4">
         {filteredVulns.map(vuln => (
-          <div key={vuln.id} className="bg-gray-900 rounded-xl border border-gray-800 p-6 hover:border-purple-500 transition">
+          <div 
+            key={vuln.id} 
+            onClick={() => handleVulnClick(vuln)}
+            className="bg-gray-900 rounded-xl border border-gray-800 p-6 hover:border-purple-500 transition cursor-pointer"
+          >
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <h3 className="text-lg font-bold">{vuln.type}</h3>
                 <p className="text-gray-400 text-sm mt-1">{vuln.title}</p>
-                <p className="text-gray-500 text-xs mt-2">Confidence: {vuln.confidence}%</p>
+                <div className="flex items-center gap-4 mt-2 text-xs">
+                  <span className="text-gray-500">Confidence: {vuln.confidence}%</span>
+                  {vuln.cwe_id && <span className="text-purple-400">{vuln.cwe_id}</span>}
+                  {vuln.cvss_score && <span className="text-orange-400">CVSS: {vuln.cvss_score}</span>}
+                </div>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                 vuln.severity === 'critical' ? 'bg-red-500' :
@@ -466,6 +514,17 @@ const VulnerabilitiesPage = ({ vulnerabilities }) => {
           </div>
         ))}
       </div>
+
+      {/* Detailed Vulnerability Modal */}
+      {showDetailModal && selectedVuln && (
+        <DetailedVulnerabilityModal 
+          vuln={selectedVuln}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedVuln(null);
+          }}
+        />
+      )}
     </div>
   );
 };
