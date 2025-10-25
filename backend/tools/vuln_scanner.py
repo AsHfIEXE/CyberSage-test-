@@ -95,10 +95,20 @@ class VulnerabilityScanner:
         all_vulnerabilities.extend(file_vulns)
         self.broadcaster.broadcast_tool_completed(scan_id, 'Sensitive File Scanner', 'success', len(file_vulns))
         
-        # Save all vulnerabilities and broadcast
+        # Save all vulnerabilities and link HTTP evidence
         for vuln in all_vulnerabilities:
             vuln_id = self.db.add_vulnerability(scan_id, vuln)
             vuln['id'] = vuln_id
+            
+            # Link HTTP evidence to vulnerability
+            raw_data = vuln.get('raw_data', {})
+            if isinstance(raw_data, dict) and 'evidence_id' in raw_data:
+                evidence_id = raw_data['evidence_id']
+                try:
+                    self.db.link_http_evidence_to_vuln(evidence_id, vuln_id)
+                except Exception as e:
+                    print(f"[WARNING] Failed to link HTTP evidence {evidence_id} to vuln {vuln_id}: {e}")
+            
             self.broadcaster.broadcast_vulnerability_found(scan_id, vuln)
         
         # Update statistics
@@ -325,7 +335,7 @@ class VulnerabilityScanner:
                         if is_reflected:
                             # Verify it's exploitable (not encoded)
                             if self._verify_xss_exploitable(response.text, payload_data['payload']):
-                                # Found XSS!
+                                # Found XSS! Collect evidence first
                                 evidence = self._collect_http_evidence(
                                     scan_id, method, endpoint, test_params, response
                                 )
@@ -339,21 +349,28 @@ class VulnerabilityScanner:
                                                  f"allowing execution of malicious JavaScript code.",
                                     'url': endpoint,
                                     'confidence': 95,
+                                    'confidence_score': 95,
                                     'tool': 'enhanced_xss_scanner',
+                                    'detection_tool': 'CyberSage XSS Scanner',
                                     'affected_parameter': param_name,
                                     'payload': payload_data['payload'],
                                     'context': payload_data['context'],
                                     'poc': self._generate_xss_poc(endpoint, method, param_name, payload_data['payload']),
+                                    'proof_of_concept': self._generate_xss_poc(endpoint, method, param_name, payload_data['payload']),
                                     'remediation': self._get_xss_remediation(payload_data['context']),
                                     'cwe_id': 'CWE-79',
+                                    'cve_id': None,
                                     'cvss_score': 7.1,
-                                    'raw_data': {
+                                    'http_evidence': [evidence],  # Include evidence directly
+                                    'raw_data': json.dumps({
                                         'parameter': param_name,
                                         'payload': payload_data['payload'],
                                         'context': payload_data['context'],
                                         'method': method,
-                                        'evidence_id': evidence['id']
-                                    }
+                                        'evidence_id': evidence['id'],
+                                        'request': evidence['request_body'],
+                                        'response_code': evidence['response_code']
+                                    })
                                 }
                                 
                                 vulnerabilities.append(vuln)
@@ -476,7 +493,7 @@ class VulnerabilityScanner:
                                 detection_details = f"Response delayed by {elapsed:.2f} seconds"
                         
                         if is_vulnerable:
-                            # Found SQL injection!
+                            # Found SQL injection! Collect evidence first
                             evidence = self._collect_http_evidence(
                                 scan_id, method, endpoint, test_params, response
                             )
@@ -490,21 +507,28 @@ class VulnerabilityScanner:
                                              f"and potentially extract, modify, or delete data.",
                                 'url': endpoint,
                                 'confidence': 95,
+                                'confidence_score': 95,
                                 'tool': 'enhanced_sqli_scanner',
+                                'detection_tool': 'CyberSage SQLi Scanner',
                                 'affected_parameter': param_name,
                                 'payload': test['payload'],
                                 'technique': test['technique'],
                                 'poc': self._generate_sqli_poc(endpoint, method, param_name, test['payload'], detection_details),
+                                'proof_of_concept': self._generate_sqli_poc(endpoint, method, param_name, test['payload'], detection_details),
                                 'remediation': self._get_sqli_remediation(),
                                 'cwe_id': 'CWE-89',
+                                'cve_id': None,
                                 'cvss_score': 9.8,
+                                'http_evidence': [evidence],  # Include evidence directly
                                 'raw_data': {
                                     'parameter': param_name,
                                     'payload': test['payload'],
                                     'technique': test['technique'],
                                     'detection': detection_details,
                                     'method': method,
-                                    'evidence_id': evidence['id']
+                                    'evidence_id': evidence['id'],
+                                    'request': evidence['request_body'],
+                                    'response_code': evidence['response_code']
                                 }
                             }
                             
@@ -518,8 +542,8 @@ class VulnerabilityScanner:
         print(f"[SQLi Scanner] Found {len(vulnerabilities)} SQL injection vulnerabilities")
         return vulnerabilities
     
-    def _collect_http_evidence(self, scan_id, method, url, params, response):
-        """Collect detailed HTTP request/response evidence"""
+    def _collect_http_evidence(self, scan_id, method, url, params, response, vuln_id=None):
+        """Collect detailed HTTP request/response evidence and link to vulnerability"""
         # Format request
         if method == 'POST':
             req_body = urlencode(params)
@@ -531,7 +555,7 @@ class VulnerabilityScanner:
         req_headers = "\n".join([f"{k}: {v}" for k, v in self.session.headers.items()])
         resp_headers = "\n".join([f"{k}: {v}" for k, v in response.headers.items()])
         
-        # Store in database
+        # Store in database with vulnerability link
         evidence_id = self.db.add_http_request(
             scan_id=scan_id,
             method=method,
@@ -542,22 +566,19 @@ class VulnerabilityScanner:
             resp_headers=resp_headers[:10000],
             resp_body=response.text[:50000],
             resp_time_ms=int(response.elapsed.total_seconds() * 1000),
-            vuln_id=None
+            vuln_id=vuln_id
         )
         
         return {
             'id': evidence_id,
-            'request': {
-                'method': method,
-                'url': req_url,
-                'headers': req_headers,
-                'body': req_body
-            },
-            'response': {
-                'status': response.status_code,
-                'headers': resp_headers,
-                'body': response.text[:1000]
-            }
+            'method': method,
+            'url': req_url,
+            'request_headers': req_headers,
+            'request_body': req_body,
+            'response_code': response.status_code,
+            'response_headers': resp_headers,
+            'response_body': response.text[:50000],
+            'response_time_ms': int(response.elapsed.total_seconds() * 1000)
         }
     
     # Helper methods

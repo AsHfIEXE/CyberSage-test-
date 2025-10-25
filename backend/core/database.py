@@ -219,26 +219,37 @@ class Database:
                 ''', (status, error_message, scan_id))
     
     def add_vulnerability(self, scan_id, vuln_data):
-        """Add a vulnerability finding"""
+        """Add a vulnerability finding with complete data"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            
+            # Serialize raw_data if it's a dict
+            raw_data = vuln_data.get('raw_data', {})
+            if isinstance(raw_data, dict):
+                raw_data = json.dumps(raw_data)
+            
             cursor.execute('''
                 INSERT INTO vulnerabilities 
                 (scan_id, vuln_type, severity, title, description, confidence_score, 
-                 detection_tool, affected_url, proof_of_concept, remediation, raw_data)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 detection_tool, affected_url, affected_parameter, payload,
+                 proof_of_concept, remediation, cwe_id, cvss_score, raw_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 scan_id,
                 vuln_data.get('type'),
                 vuln_data.get('severity'),
                 vuln_data.get('title'),
                 vuln_data.get('description'),
-                vuln_data.get('confidence', 50),
-                vuln_data.get('tool'),
+                vuln_data.get('confidence_score', vuln_data.get('confidence', 50)),
+                vuln_data.get('detection_tool', vuln_data.get('tool')),
                 vuln_data.get('url'),
-                vuln_data.get('poc'),
+                vuln_data.get('affected_parameter'),
+                vuln_data.get('payload'),
+                vuln_data.get('proof_of_concept', vuln_data.get('poc')),
                 vuln_data.get('remediation'),
-                json.dumps(vuln_data.get('raw_data', {}))
+                vuln_data.get('cwe_id'),
+                vuln_data.get('cvss_score'),
+                raw_data
             ))
             return cursor.lastrowid
     
@@ -391,6 +402,16 @@ class Database:
             row = cursor.fetchone()
             return dict(row) if row else {}
     
+    def link_http_evidence_to_vuln(self, evidence_id, vuln_id):
+        """Link HTTP evidence to a vulnerability"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE http_history 
+                SET vulnerability_id = ? 
+                WHERE id = ?
+            ''', (vuln_id, evidence_id))
+    
     def get_vulnerability_details(self, vuln_id):
         """Get full vulnerability details including HTTP history"""
         with self.get_connection() as conn:
@@ -407,6 +428,13 @@ class Database:
                     ORDER BY timestamp DESC
                 ''', (vuln_id,))
                 vuln['http_history'] = [dict(row) for row in cursor.fetchall()]
+                
+                # Parse raw_data if it exists
+                if vuln.get('raw_data'):
+                    try:
+                        vuln['raw_data'] = json.loads(vuln['raw_data'])
+                    except:
+                        pass
             
             return vuln
 
