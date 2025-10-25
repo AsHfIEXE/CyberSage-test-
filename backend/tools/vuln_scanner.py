@@ -200,8 +200,8 @@ class VulnerabilityScanner:
         
         print(f"[Endpoint Discovery] Starting deep discovery...")
         
-        # Discover from initial endpoints
-        for endpoint in initial_endpoints[:50]:  # Limit to prevent excessive crawling
+        # Discover from initial endpoints (INCREASED DEPTH)
+        for endpoint in initial_endpoints[:100]:  # Increased from 50 to 100
             if endpoint in visited:
                 continue
             visited.add(endpoint)
@@ -249,7 +249,7 @@ class VulnerabilityScanner:
         
         print(f"[Endpoint Discovery] Discovered {len(unique)} testable endpoints")
         
-        return unique[:100]  # Limit to 100 endpoints
+        return unique[:200]  # Increased limit to 200 endpoints for deeper scanning
     
     def _extract_forms(self, base_url, soup):
         """Extract all forms from page with detailed field information"""
@@ -372,18 +372,69 @@ class VulnerabilityScanner:
                 'context': 'JavaScript',
                 'detection': ["'-alert(1)-'", 'alert(1)'],
                 'severity': 'high'
+            },
+            # DOM-based XSS payloads
+            {
+                'payload': '#<img src=x onerror=alert(1)>',
+                'context': 'DOM',
+                'detection': ['<img src=x', 'onerror=alert'],
+                'severity': 'high'
+            },
+            {
+                'payload': 'javascript:alert(1)',
+                'context': 'DOM',
+                'detection': ['javascript:alert'],
+                'severity': 'high'
+            },
+            {
+                'payload': '"><svg/onload=confirm(1)>',
+                'context': 'DOM',
+                'detection': ['<svg', 'onload=confirm'],
+                'severity': 'high'
+            },
+            # Additional bypass payloads
+            {
+                'payload': '<iframe src="javascript:alert(1)">',
+                'context': 'HTML',
+                'detection': ['<iframe', 'javascript:alert'],
+                'severity': 'high'
+            },
+            {
+                'payload': '<body onload=alert(1)>',
+                'context': 'HTML',
+                'detection': ['<body', 'onload=alert'],
+                'severity': 'high'
+            },
+            {
+                'payload': '<details open ontoggle=alert(1)>',
+                'context': 'HTML',
+                'detection': ['<details', 'ontoggle=alert'],
+                'severity': 'high'
+            },
+            # Filter bypass
+            {
+                'payload': '<ScRiPt>alert(1)</sCrIpT>',
+                'context': 'HTML',
+                'detection': ['<script>alert', '<ScRiPt>'],
+                'severity': 'high'
+            },
+            {
+                'payload': '<img src=x oNeRrOr=alert(1)>',
+                'context': 'HTML',
+                'detection': ['oNeRrOr', 'alert(1)'],
+                'severity': 'high'
             }
         ]
         
-        for endpoint_data in endpoints[:30]:  # Test first 30 endpoints
+        for endpoint_data in endpoints[:50]:  # Increased from 30 to 50 endpoints
             endpoint = endpoint_data['url']
             params = endpoint_data['params']
             method = endpoint_data['method']
             
             print(f"[XSS Scanner] Testing: {endpoint}")
             
-            for param_name in list(params.keys())[:5]:  # Test first 5 params per endpoint
-                for payload_data in xss_payloads[:4]:  # Test first 4 payloads per param
+            for param_name in list(params.keys())[:10]:  # Increased from 5 to 10 params
+                for payload_data in xss_payloads:  # Test ALL payloads (removed limit)
                     self.payloads_tested += 1
                     
                     try:
@@ -407,6 +458,20 @@ class VulnerabilityScanner:
                                     scan_id, method, endpoint, test_params, response
                                 )
                                 
+                                # Calculate improved confidence score
+                                confidence = self._calculate_confidence_score(
+                                    vuln_type='xss',
+                                    detection_type='reflected',
+                                    technique=payload_data['context'],
+                                    detection_details=f"Payload reflected unencoded in {payload_data['context']} context",
+                                    response_analysis={
+                                        'is_reflected': is_reflected,
+                                        'is_exploitable': True,
+                                        'context': payload_data['context'],
+                                        'payload_complexity': len(payload_data['payload'])
+                                    }
+                                )
+                                
                                 vuln = {
                                     'type': 'Cross-Site Scripting (XSS)',
                                     'severity': payload_data['severity'],
@@ -415,8 +480,8 @@ class VulnerabilityScanner:
                                                  f"User input is reflected in the {payload_data['context']} context without proper encoding, "
                                                  f"allowing execution of malicious JavaScript code.",
                                     'url': endpoint,
-                                    'confidence': 95,
-                                    'confidence_score': 95,
+                                    'confidence': confidence,
+                                    'confidence_score': confidence,
                                     'tool': 'enhanced_xss_scanner',
                                     'detection_tool': 'CyberSage XSS Scanner',
                                     'affected_parameter': param_name,
@@ -495,6 +560,63 @@ class VulnerabilityScanner:
                 'technique': 'Time-based blind',
                 'detection_type': 'time',
                 'delay': 5
+            },
+            # UNION-based SQLi (NEW!)
+            {
+                'payload': "' UNION SELECT NULL--",
+                'technique': 'UNION-based',
+                'detection_type': 'union',
+                'union_patterns': [
+                    r'NULL',
+                    r'UNION',
+                    r'The used SELECT statements have a different number of columns'
+                ]
+            },
+            {
+                'payload': "' UNION SELECT NULL,NULL--",
+                'technique': 'UNION-based (2 columns)',
+                'detection_type': 'union',
+                'union_patterns': [r'NULL']
+            },
+            {
+                'payload': "' UNION SELECT NULL,NULL,NULL--",
+                'technique': 'UNION-based (3 columns)',
+                'detection_type': 'union',
+                'union_patterns': [r'NULL']
+            },
+            {
+                'payload': "' UNION SELECT 1,2,3--",
+                'technique': 'UNION-based (numeric)',
+                'detection_type': 'union',
+                'union_patterns': [r'[123]']
+            },
+            {
+                'payload': "' UNION SELECT table_name FROM information_schema.tables--",
+                'technique': 'UNION-based (information schema)',
+                'detection_type': 'union',
+                'union_patterns': [r'table_name', r'information_schema']
+            },
+            {
+                'payload': "' UNION ALL SELECT NULL,NULL,NULL--",
+                'technique': 'UNION ALL-based',
+                'detection_type': 'union',
+                'union_patterns': [r'NULL']
+            },
+            # ORDER BY technique for column enumeration
+            {
+                'payload': "' ORDER BY 1--",
+                'technique': 'ORDER BY column enumeration',
+                'detection_type': 'differential'
+            },
+            {
+                'payload': "' ORDER BY 10--",
+                'technique': 'ORDER BY column enumeration (high)',
+                'detection_type': 'error',
+                'error_patterns': [
+                    r"Unknown column",
+                    r"ORDER BY position",
+                    r"invalid ORDER BY"
+                ]
             }
         ]
         
@@ -516,8 +638,8 @@ class VulnerabilityScanner:
             except:
                 continue
             
-            for param_name in list(params.keys())[:5]:
-                for test in sqli_tests[:3]:  # Test first 3 techniques
+            for param_name in list(params.keys())[:10]:  # Increased from 5 to 10 params
+                for test in sqli_tests:  # Test ALL techniques (removed limit)
                     self.payloads_tested += 1
                     
                     try:
@@ -559,10 +681,38 @@ class VulnerabilityScanner:
                                 is_vulnerable = True
                                 detection_details = f"Response delayed by {elapsed:.2f} seconds"
                         
+                        elif test['detection_type'] == 'union':
+                            # UNION-based detection (NEW!)
+                            for pattern in test.get('union_patterns', []):
+                                if re.search(pattern, response.text, re.IGNORECASE):
+                                    is_vulnerable = True
+                                    detection_details = f"UNION-based SQLi detected: {pattern} found in response"
+                                    break
+                            # Also check for different content compared to baseline
+                            if not is_vulnerable:
+                                length_diff = abs(len(response.text) - baseline_length)
+                                if length_diff > 50:  # UNION often changes response significantly
+                                    is_vulnerable = True
+                                    detection_details = f"UNION query changed response by {length_diff} bytes"
+                        
                         if is_vulnerable:
                             # Found SQL injection! Collect evidence first
                             evidence = self._collect_http_evidence(
                                 scan_id, method, endpoint, test_params, response
+                            )
+                            
+                            # Calculate confidence score with improved algorithm
+                            confidence = self._calculate_confidence_score(
+                                vuln_type='sqli',
+                                detection_type=test['detection_type'],
+                                technique=test['technique'],
+                                detection_details=detection_details,
+                                response_analysis={
+                                    'length_diff': abs(len(response.text) - baseline_length),
+                                    'time_delay': elapsed if test['detection_type'] == 'time' else 0,
+                                    'has_error_pattern': test['detection_type'] == 'error',
+                                    'has_union_pattern': test['detection_type'] == 'union'
+                                }
                             )
                             
                             vuln = {
@@ -573,8 +723,8 @@ class VulnerabilityScanner:
                                              f"{detection_details}. This allows attackers to manipulate database queries "
                                              f"and potentially extract, modify, or delete data.",
                                 'url': endpoint,
-                                'confidence': 95,
-                                'confidence_score': 95,
+                                'confidence': confidence,
+                                'confidence_score': confidence,
                                 'tool': 'enhanced_sqli_scanner',
                                 'detection_tool': 'CyberSage SQLi Scanner',
                                 'affected_parameter': param_name,
@@ -1133,3 +1283,84 @@ Implement web application firewall (WAF) rules."""
             if scan_id:
                 self.broadcaster.broadcast_log(scan_id, f"[WARNING] Request failed: {url} - {str(e)}", 'warning')
             return None
+    
+    def _calculate_confidence_score(self, vuln_type, detection_type, technique, detection_details, response_analysis):
+        """
+        Calculate improved confidence score based on multiple factors
+        Returns: confidence score (0-100)
+        """
+        base_score = 50  # Start at 50%
+        
+        # Factor 1: Detection type reliability
+        detection_reliability = {
+            'error': 30,        # SQL errors are very reliable
+            'time': 25,         # Time-based is reliable but can have false positives
+            'differential': 20, # Boolean-based needs more validation
+            'union': 30,        # UNION-based is very reliable
+            'reflected': 25     # XSS reflection is good but needs exploitability check
+        }
+        base_score += detection_reliability.get(detection_type, 15)
+        
+        # Factor 2: Vulnerability type confidence
+        if vuln_type == 'sqli':
+            # SQL Injection confidence factors
+            if response_analysis.get('has_error_pattern'):
+                base_score += 15  # SQL error patterns are highly reliable
+            
+            if response_analysis.get('has_union_pattern'):
+                base_score += 10  # UNION patterns are reliable
+            
+            if response_analysis.get('time_delay', 0) >= 5:
+                base_score += 10  # Significant delay indicates time-based SQLi
+            
+            if response_analysis.get('length_diff', 0) > 200:
+                base_score += 5  # Large response difference
+            elif response_analysis.get('length_diff', 0) > 100:
+                base_score += 3  # Moderate response difference
+            
+            # Technique-based adjustments
+            if 'UNION' in technique:
+                base_score += 5  # UNION-based is more reliable
+            if 'Error-based' in technique:
+                base_score += 5  # Error-based is highly reliable
+            
+        elif vuln_type == 'xss':
+            # XSS confidence factors
+            if response_analysis.get('is_exploitable'):
+                base_score += 20  # Confirmed exploitable
+            
+            if response_analysis.get('is_reflected'):
+                base_score += 10  # Payload is reflected
+            
+            # Context-based adjustments
+            context = response_analysis.get('context', '').lower()
+            if context == 'html':
+                base_score += 5  # HTML context is easier to exploit
+            elif context == 'javascript':
+                base_score += 10  # JavaScript context is complex but high impact
+            elif context == 'dom':
+                base_score += 8  # DOM-based is reliable
+            elif context == 'attribute':
+                base_score += 5  # Attribute context
+            
+            # Payload complexity (simpler payloads that work = higher confidence)
+            payload_len = response_analysis.get('payload_complexity', 0)
+            if payload_len < 30:
+                base_score += 5  # Simple payload worked
+            elif payload_len < 50:
+                base_score += 3  # Moderate complexity
+        
+        # Factor 3: Multiple evidence points
+        if 'SQL error' in detection_details or 'syntax' in detection_details.lower():
+            base_score += 5  # Clear error message
+        
+        if 'delayed' in detection_details.lower():
+            base_score += 5  # Time-based confirmation
+        
+        if 'reflected' in detection_details.lower() and 'unencoded' in detection_details.lower():
+            base_score += 5  # XSS reflection without encoding
+        
+        # Ensure score is within bounds
+        confidence = min(max(base_score, 0), 100)
+        
+        return int(confidence)

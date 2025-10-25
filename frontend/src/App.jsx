@@ -3,6 +3,8 @@ import { io } from 'socket.io-client';
 import DetailedVulnerabilityModal from './components/DetailedVulnerabilityModal';
 import RealTimeLogs from './components/RealTimeLogs';
 import ScanControlPanel from './components/ScanControlPanel';
+import ModernNavigation from './components/ModernNavigation';
+import StatsCard from './components/StatsCard';
 
 // ============================================================================
 // MAIN APP WITH PROPER NAVIGATION
@@ -161,67 +163,23 @@ const CyberSageApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Top Navigation */}
-      <nav className="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center space-x-8">
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-                CyberSage v2.0 Professional
-              </h1>
-              <div className="hidden md:flex space-x-1">
-                {navigation.map(page => (
-                  <button
-                    key={page.id}
-                    onClick={() => setCurrentPage(page.id)}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition ${
-                      currentPage === page.id
-                        ? 'bg-purple-600 text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                    }`}
-                  >
-                    <span className="mr-2">{page.icon}</span>
-                    {page.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm ${
-              connected ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="font-medium">{connected ? 'Connected' : 'Offline'}</span>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
+      {/* Modern Sidebar Navigation */}
+      <ModernNavigation 
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        stats={stats}
+        scanStatus={scanStatus}
+      />
 
-      {/* Mobile Navigation */}
-      <div className="md:hidden bg-gray-900 border-b border-gray-800 overflow-x-auto">
-        <div className="flex space-x-1 px-4 py-2">
-          {navigation.map(page => (
-            <button
-              key={page.id}
-              onClick={() => setCurrentPage(page.id)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap ${
-                currentPage === page.id
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800'
-              }`}
-            >
-              {page.icon} {page.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      {/* Main Content Area */}
+      <main className="ml-72 min-h-screen p-8">
         {!connected && (
-          <div className="mb-6 bg-red-900/30 border border-red-500 rounded-lg p-4">
+          <div className="mb-6 bg-red-900/30 border border-red-500 rounded-lg p-4 animate-pulse">
             <p className="text-red-400 font-medium">⚠️ Backend not connected. Make sure backend is running on http://localhost:5000</p>
           </div>
         )}
+        
         {renderPage()}
       </main>
     </div>
@@ -233,7 +191,27 @@ const CyberSageApp = () => {
 // ============================================================================
 const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPhase, chains, currentScanId, aiInsights, toolActivity, socket }) => (
   <div className="space-y-6">
-    <h2 className="text-3xl font-bold">Security Dashboard</h2>
+    <div className="flex items-center justify-between">
+      <h2 className="text-3xl font-bold">Security Dashboard</h2>
+      {scanStatus !== 'idle' && (
+        <div className="flex items-center space-x-3">
+          <div className={`px-4 py-2 rounded-lg font-semibold ${
+            scanStatus === 'running' ? 'bg-green-500/20 text-green-400' :
+            scanStatus === 'completed' ? 'bg-blue-500/20 text-blue-400' :
+            'bg-red-500/20 text-red-400'
+          }`}>
+            {scanStatus === 'running' ? '🔄 Scanning...' :
+             scanStatus === 'completed' ? '✅ Scan Complete' :
+             '⚠️ Scan Failed'}
+          </div>
+          {scanStatus === 'running' && (
+            <div className="text-gray-400 text-sm">
+              {Math.round(progress)}% • {currentPhase}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
     
     {/* Scan Control Panel */}
     {scanStatus === 'running' && (
@@ -246,64 +224,179 @@ const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPh
       />
     )}
 
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {[
-        { key: 'critical', label: 'Critical', icon: '🔴', color: 'red' },
-        { key: 'high', label: 'High', icon: '🟠', color: 'orange' },
-        { key: 'medium', label: 'Medium', icon: '🟡', color: 'yellow' },
-        { key: 'low', label: 'Low', icon: '🟢', color: 'blue' }
-      ].map(stat => (
-        <div key={stat.key} className="bg-gray-900 rounded-xl border border-gray-800 p-6 hover:border-purple-500 transition">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-400 text-sm">{stat.label}</span>
-            <span className="text-2xl">{stat.icon}</span>
-          </div>
-          <p className="text-3xl font-bold">{stats[stat.key]}</p>
-        </div>
-      ))}
+    {/* Beautiful Stats Cards */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StatsCard 
+        title="Critical Vulnerabilities"
+        value={stats.critical}
+        icon="🔴"
+        color="red"
+        subtitle="Immediate attention required"
+      />
+      <StatsCard 
+        title="High Severity"
+        value={stats.high}
+        icon="🟠"
+        color="orange"
+        subtitle="Fix within 24-48 hours"
+      />
+      <StatsCard 
+        title="Medium Risk"
+        value={stats.medium}
+        icon="🟡"
+        color="yellow"
+        subtitle="Address soon"
+      />
+      <StatsCard 
+        title="Low Priority"
+        value={stats.low}
+        icon="🟢"
+        color="blue"
+        subtitle="Minor issues"
+      />
     </div>
 
+    {/* Detailed Scan Summary */}
+    {(vulnerabilities.length > 0 || toolActivity.length > 0) && (
+      <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 rounded-xl border-2 border-purple-500/50 p-6">
+        <h3 className="text-xl font-bold mb-4 flex items-center">
+          <span className="mr-2">📊</span>
+          Scan Summary
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-black/30 rounded-lg p-4">
+            <div className="text-gray-400 text-sm">Total Vulnerabilities</div>
+            <div className="text-3xl font-bold text-purple-400">{vulnerabilities.length}</div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-4">
+            <div className="text-gray-400 text-sm">Tools Executed</div>
+            <div className="text-3xl font-bold text-blue-400">{toolActivity.length}</div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-4">
+            <div className="text-gray-400 text-sm">Critical + High</div>
+            <div className="text-3xl font-bold text-red-400">{stats.critical + stats.high}</div>
+          </div>
+          <div className="bg-black/30 rounded-lg p-4">
+            <div className="text-gray-400 text-sm">Scan Progress</div>
+            <div className="text-3xl font-bold text-green-400">{Math.round(progress)}%</div>
+          </div>
+        </div>
+      </div>
+    )}
+
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Enhanced Vulnerabilities List */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <h3 className="text-xl font-bold mb-4">Recent Vulnerabilities</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold">Detected Vulnerabilities</h3>
+          <span className="text-sm text-gray-400">
+            {vulnerabilities.length} total
+          </span>
+        </div>
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {vulnerabilities.slice(0, 5).map(vuln => (
-            <div key={vuln.id} className="bg-gray-800 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">{vuln.type}</span>
-                <span className={`px-2 py-1 rounded text-xs ${
-                  vuln.severity === 'critical' ? 'bg-red-500' :
-                  vuln.severity === 'high' ? 'bg-orange-500' :
-                  vuln.severity === 'medium' ? 'bg-yellow-500 text-black' : 'bg-blue-500'
-                }`}>
-                  {vuln.severity?.toUpperCase()}
-                </span>
-              </div>
-              <p className="text-sm text-gray-400 mt-2">{vuln.title}</p>
+          {vulnerabilities.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">🔍</div>
+              <p>No vulnerabilities detected yet</p>
+              {scanStatus === 'idle' && <p className="text-sm mt-2">Start a scan to begin</p>}
             </div>
-          ))}
+          ) : (
+            vulnerabilities.slice(0, 10).map(vuln => (
+              <div key={vuln.id} className="bg-gray-800 rounded-lg p-4 hover:bg-gray-750 transition">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        vuln.severity === 'critical' ? 'bg-red-500' :
+                        vuln.severity === 'high' ? 'bg-orange-500' :
+                        vuln.severity === 'medium' ? 'bg-yellow-500 text-black' : 'bg-blue-500'
+                      }`}>
+                        {vuln.severity?.toUpperCase()}
+                      </span>
+                      {vuln.confidence && (
+                        <span className="text-xs text-gray-400">
+                          {vuln.confidence}% confidence
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-semibold text-white">{vuln.title || vuln.type}</p>
+                    {vuln.affected_parameter && (
+                      <p className="text-xs text-purple-400 mt-1">
+                        Parameter: {vuln.affected_parameter}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {vuln.tool || vuln.detection_tool}
+                  </div>
+                </div>
+                {vuln.description && (
+                  <p className="text-sm text-gray-400 mt-2 line-clamp-2">
+                    {vuln.description.substring(0, 150)}...
+                  </p>
+                )}
+                {vuln.url && (
+                  <p className="text-xs text-gray-600 mt-2 truncate">
+                    🔗 {vuln.url}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
+      {/* Enhanced Tool Activity */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <h3 className="text-xl font-bold mb-4">Tool Activity</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold">Professional Tools Activity</h3>
+          <span className="text-sm text-gray-400">
+            {toolActivity.filter(t => t.status === 'completed').length}/{toolActivity.length} completed
+          </span>
+        </div>
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {toolActivity.slice(0, 5).map((item, idx) => (
-            <div key={idx} className="flex items-center p-3 bg-gray-800 rounded-lg">
-              <div className={`w-2 h-2 rounded-full mr-3 ${
-                item.status === 'running' ? 'bg-green-500 animate-pulse' : 'bg-blue-500'
-              }`} />
-              <div className="flex-1">
-                <p className="text-white text-sm font-medium">{item.tool}</p>
-                <p className="text-gray-500 text-xs truncate">{item.target}</p>
-              </div>
-              {item.findings !== undefined && (
-                <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">
-                  {item.findings} found
-                </span>
-              )}
+          {toolActivity.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">🛠️</div>
+              <p>No tools running yet</p>
+              {scanStatus === 'idle' && <p className="text-sm mt-2">Enable tools in scanner settings</p>}
             </div>
-          ))}
+          ) : (
+            toolActivity.map((item, idx) => (
+              <div key={idx} className="bg-gray-800 rounded-lg p-4 hover:bg-gray-750 transition">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center flex-1">
+                    <div className={`w-3 h-3 rounded-full mr-3 ${
+                      item.status === 'running' ? 'bg-green-500 animate-pulse' :
+                      item.status === 'completed' ? 'bg-blue-500' :
+                      'bg-gray-500'
+                    }`} />
+                    <div className="flex-1">
+                      <p className="text-white font-semibold">{item.tool}</p>
+                      <p className="text-gray-500 text-xs truncate mt-1">{item.target}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {item.status === 'running' && (
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                        Running
+                      </span>
+                    )}
+                    {item.status === 'completed' && item.findings !== undefined && (
+                      <span className="text-xs bg-purple-600 text-white px-2 py-1 rounded-full">
+                        {item.findings} findings
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {item.timestamp && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Started: {new Date(item.timestamp * 1000).toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

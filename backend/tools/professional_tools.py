@@ -39,7 +39,9 @@ class ProfessionalToolsIntegration:
             except:
                 installed[tool] = False
         
-        print(f"[Tools Check] Installed tools: {[k for k,v in installed.items() if v]}")
+        installed_list = [k for k,v in installed.items() if v]
+        print(f"[Tools Check] Installed tools: {installed_list}")
+        print(f"[Tools Check] Missing tools: {[k for k,v in installed.items() if not v]}")
         return installed
     
     def _run_command(self, cmd: str, timeout: int = 300) -> tuple:
@@ -93,7 +95,9 @@ class ProfessionalToolsIntegration:
         host = parsed.netloc.split(':')[0] if parsed.netloc else parsed.path
         
         # Comprehensive Nmap scan: Service detection and script scanning
-        cmd = f"nmap -Pn -sV --script=vuln,default -{timing} -p 1-1000 {host}"
+        # Use sudo if available for better results, fallback to regular user
+        sudo_prefix = "sudo " if os.name != 'nt' else ""
+        cmd = f"{sudo_prefix}nmap -Pn -sV --script=vuln,default -{timing} -p 1-1000 {host}"
         
         self.broadcaster.broadcast_log(scan_id, f"[Nmap] Scanning ports 1-1000 on {host}...")
         stdout, stderr, returncode = self._run_command(cmd, timeout=600)
@@ -303,10 +307,27 @@ class ProfessionalToolsIntegration:
         self.broadcaster.broadcast_tool_started(scan_id, 'Ffuf', target)
         
         # Check if wordlist exists, fallback to custom
-        if not os.path.exists(wordlist):
-            wordlist = '/tmp/custom_wordlist.txt'
-            with open(wordlist, 'w') as f:
-                f.write('\n'.join(['admin', 'login', 'api', 'test', 'backup', 'config', 'upload', 'download']))
+        wordlist_options = [
+            wordlist,
+            '/usr/share/wordlists/dirb/common.txt',
+            '/usr/share/seclists/Discovery/Web-Content/common.txt',
+            '/usr/share/dirb/wordlists/common.txt'
+        ]
+        
+        wordlist_found = None
+        for wl in wordlist_options:
+            if os.path.exists(wl):
+                wordlist_found = wl
+                self.broadcaster.broadcast_log(scan_id, f"[Ffuf] Using wordlist: {wl}")
+                break
+        
+        if not wordlist_found:
+            wordlist_found = '/tmp/custom_wordlist.txt'
+            with open(wordlist_found, 'w') as f:
+                f.write('\n'.join(['admin', 'login', 'api', 'test', 'backup', 'config', 'upload', 'download', 'dashboard', 'panel']))
+            self.broadcaster.broadcast_log(scan_id, f"[Ffuf] Using fallback wordlist: {wordlist_found}")
+        
+        wordlist = wordlist_found
         
         cmd = f"ffuf -u {target}/FUZZ -w {wordlist} -mc 200,201,204,301,302,307,401,403 -t 20 -timeout 10"
         
@@ -351,11 +372,28 @@ class ProfessionalToolsIntegration:
         findings = []
         self.broadcaster.broadcast_tool_started(scan_id, 'Gobuster', target)
         
-        # Fallback wordlist
-        if not os.path.exists(wordlist):
-            wordlist = '/tmp/custom_wordlist.txt'
-            with open(wordlist, 'w') as f:
-                f.write('\n'.join(['admin', 'login', 'api', 'test', 'backup', 'config', 'upload']))
+        # Fallback wordlist - try multiple locations
+        wordlist_options = [
+            wordlist,
+            '/usr/share/wordlists/dirb/common.txt',
+            '/usr/share/seclists/Discovery/Web-Content/common.txt',
+            '/usr/share/dirb/wordlists/common.txt'
+        ]
+        
+        wordlist_found = None
+        for wl in wordlist_options:
+            if os.path.exists(wl):
+                wordlist_found = wl
+                self.broadcaster.broadcast_log(scan_id, f"[Gobuster] Using wordlist: {wl}")
+                break
+        
+        if not wordlist_found:
+            wordlist_found = '/tmp/custom_wordlist.txt'
+            with open(wordlist_found, 'w') as f:
+                f.write('\n'.join(['admin', 'login', 'api', 'test', 'backup', 'config', 'upload', 'dashboard']))
+            self.broadcaster.broadcast_log(scan_id, f"[Gobuster] Using fallback wordlist: {wordlist_found}")
+        
+        wordlist = wordlist_found
         
         cmd = f"gobuster dir -u {target} -w {wordlist} -t 20 -q -k"
         

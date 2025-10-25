@@ -84,56 +84,56 @@ class ScanOrchestrator:
                     self.db.add_vulnerability(scan_id, nf)
                 all_vulnerabilities.extend(nmap_findings)
             
-            # Run other professional tools if selected
-            if tools_config.get('theHarvester', False):
+            # Run other professional tools if selected (enabled by default in Elite mode)
+            if tools_config.get('theHarvester', True) and scan_mode in ['elite', 'standard']:
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 harvester_findings = self.pro_tools.run_theharvester(scan_id, target)
                 all_vulnerabilities.extend(harvester_findings)
             
-            if tools_config.get('amass', False):
+            if tools_config.get('amass', True) and scan_mode in ['elite', 'standard']:
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 amass_findings = self.pro_tools.run_amass(scan_id, target)
                 all_vulnerabilities.extend(amass_findings)
             
-            if tools_config.get('whois', False):
+            if tools_config.get('whois', True):
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 whois_findings = self.pro_tools.run_whois(scan_id, target)
                 all_vulnerabilities.extend(whois_findings)
             
-            if tools_config.get('ffuf', False):
+            if tools_config.get('ffuf', True) and scan_mode == 'elite':
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 ffuf_findings = self.pro_tools.run_ffuf(scan_id, target)
                 all_vulnerabilities.extend(ffuf_findings)
             
-            if tools_config.get('gobuster', False):
+            if tools_config.get('gobuster', True) and scan_mode == 'elite':
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 gobuster_findings = self.pro_tools.run_gobuster(scan_id, target)
                 all_vulnerabilities.extend(gobuster_findings)
             
-            if tools_config.get('sqlmap', False):
+            if tools_config.get('sqlmap', True) and scan_mode in ['elite', 'standard']:
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 sqlmap_findings = self.pro_tools.run_sqlmap(scan_id, target)
                 all_vulnerabilities.extend(sqlmap_findings)
             
-            if tools_config.get('nikto', False):
+            if tools_config.get('nikto', True) and scan_mode in ['elite', 'standard']:
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 nikto_findings = self.pro_tools.run_nikto(scan_id, target)
                 all_vulnerabilities.extend(nikto_findings)
             
-            if tools_config.get('wpscan', False):
+            if tools_config.get('wpscan', True) and scan_mode == 'elite':
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 wpscan_findings = self.pro_tools.run_wpscan(scan_id, target)
                 all_vulnerabilities.extend(wpscan_findings)
             
-            if tools_config.get('nuclei', False):
+            if tools_config.get('nuclei', True) and scan_mode == 'elite':
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 nuclei_findings = self.pro_tools.run_nuclei(scan_id, target)
