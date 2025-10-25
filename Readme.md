@@ -89,10 +89,40 @@
 
 ## 🚀 Quick Start
 
-### 🐧 Linux Installation (Recommended)
+### 🐧 Linux Installation (Automated - Recommended)
 
 ```bash
 # 1. Clone the repository
+git clone https://github.com/AsHfIEXE/CyberSage-2.0.git
+cd CyberSage-2.0
+
+# 2. Run the automated setup script
+chmod +x setup.sh
+./setup.sh
+
+# This script will automatically:
+# ✅ Install professional security tools (nmap, nikto, sqlmap, gobuster, etc.)
+# ✅ Install wordlists for fuzzing
+# ✅ Set up Python virtual environment
+# ✅ Install all Python dependencies
+# ✅ Install all Node.js dependencies
+# ✅ Create configuration files
+# ✅ Initialize database
+# ✅ Create start script
+
+# 3. Start CyberSage
+./start.sh
+
+# 4. Open browser
+# http://localhost:3000
+```
+
+### 🛠️ Manual Linux Installation
+
+```bash
+# If you prefer manual installation:
+
+# 1. Clone repository
 git clone https://github.com/AsHfIEXE/CyberSage-2.0.git
 cd CyberSage-2.0
 
@@ -119,8 +149,7 @@ python app.py
 cd ../frontend
 npm start
 
-# 7. Open browser
-# http://localhost:3000
+# 7. Open browser at http://localhost:3000
 ```
 
 ### 🐳 Docker Installation
@@ -273,19 +302,77 @@ The `ScanOrchestrator` acts as a master controller, deploying a suite of best-in
 
 ## 🛠️ Troubleshooting
 
--   **WebSocket Connection Fails**:
-    -   Ensure the backend container is running: `docker ps`.
-    -   Check the backend logs for errors: `docker-compose logs backend`.
-    -   Verify the backend is accessible at `http://localhost:5000/api/health`.
+### Common Issues
 
--   **Frontend Fails to Start**:
-    -   Ensure you are in the project root directory when running `docker-compose`.
-    -   Check frontend logs: `docker-compose logs frontend`.
+**Professional Tools Not Running**:
+```bash
+# Check if tools are installed
+which nmap nikto sqlmap gobuster
 
--   **No Vulnerabilities Detected**:
-    -   Verify the target is accessible from within the Docker container.
-    -   Try scanning a known vulnerable application (like OWASP Juice Shop) to confirm the scanner is working.
-    -   Check if the target is protected by a WAF that might be blocking scan traffic.
+# If missing, re-run setup script
+./setup.sh
+
+# Or install manually
+sudo apt install nmap nikto sqlmap gobuster dirb wordlists
+```
+
+**Backend Connection Issues**:
+```bash
+# Check if backend is running
+curl http://localhost:5000/api/health
+
+# View backend logs
+tail -f backend.log
+
+# Check for port conflicts
+lsof -i :5000
+
+# Kill conflicting process
+kill -9 $(lsof -t -i:5000)
+```
+
+**Frontend Won't Start**:
+```bash
+# View frontend logs
+tail -f frontend.log
+
+# Check for port conflicts
+lsof -i :3000
+
+# Clear npm cache and reinstall
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**No Vulnerabilities Detected**:
+- ✅ Verify target is accessible: `curl -I http://target.com`
+- ✅ Try known vulnerable app: `http://testphp.vulnweb.com`
+- ✅ Check scan mode: Use **Elite** for all tools
+- ✅ Check logs for errors: `tail -f backend.log`
+- ✅ Ensure professional tools are installed: `./setup.sh`
+
+**Permission Issues (Linux)**:
+```bash
+# Give nmap capabilities
+sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which nmap)
+
+# Or run backend with sudo (not recommended for production)
+cd backend
+sudo venv/bin/python app.py
+```
+
+**Wordlist Not Found**:
+```bash
+# Install wordlists
+sudo apt install wordlists seclists
+
+# Check installation
+ls /usr/share/wordlists/
+ls /usr/share/seclists/
+
+# CyberSage will create fallback wordlist if none found
+```
 
 ---
 

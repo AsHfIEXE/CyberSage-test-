@@ -1,9 +1,41 @@
 #!/bin/bash
 
-echo "=================================="
-echo "🧠 CyberSage v2.0 Setup Script"
-echo "=================================="
+echo "=========================================="
+echo "🛡️  CyberSage v2.0 Elite Setup Script"
+echo "=========================================="
 echo ""
+echo "This script will install:"
+echo "  • Python dependencies"
+echo "  • Node.js dependencies"
+echo "  • Professional security tools"
+echo "  • Wordlists for fuzzing"
+echo ""
+
+# Detect OS
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    OS="linux"
+    echo "✅ Detected: Linux"
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    OS="mac"
+    echo "✅ Detected: macOS"
+else
+    echo "⚠️  Warning: Unknown OS. Continuing anyway..."
+    OS="unknown"
+fi
+
+echo ""
+
+# Check for sudo privileges
+if [ "$OS" == "linux" ]; then
+    echo "🔐 Checking sudo privileges..."
+    if sudo -n true 2>/dev/null; then
+        echo "✅ Sudo access confirmed"
+    else
+        echo "⚠️  Sudo access required for installing professional tools"
+        echo "   You may be prompted for your password"
+    fi
+    echo ""
+fi
 
 # Check if Python3 is installed
 if ! command -v python3 &> /dev/null; then
@@ -36,6 +68,129 @@ if ! command -v npm &> /dev/null; then
 fi
 
 echo "✅ npm found: $(npm --version)"
+
+# Professional Tools Installation (Linux only)
+if [ "$OS" == "linux" ]; then
+    echo ""
+    echo "==========================================="
+    echo "🛠️  Installing Professional Security Tools"
+    echo "==========================================="
+    echo ""
+    
+    # Detect package manager
+    if command -v apt &> /dev/null; then
+        PKG_MANAGER="apt"
+        echo "📦 Using package manager: apt"
+    elif command -v yum &> /dev/null; then
+        PKG_MANAGER="yum"
+        echo "📦 Using package manager: yum"
+    elif command -v pacman &> /dev/null; then
+        PKG_MANAGER="pacman"
+        echo "📦 Using package manager: pacman"
+    else
+        echo "⚠️  No supported package manager found"
+        echo "   Please install tools manually:"
+        echo "   - nmap, nikto, sqlmap, gobuster, dirb, wordlists"
+        PKG_MANAGER="none"
+    fi
+    
+    if [ "$PKG_MANAGER" == "apt" ]; then
+        echo ""
+        echo "📥 Updating package lists..."
+        sudo apt update -qq
+        
+        echo "📥 Installing professional security tools..."
+        TOOLS="nmap nikto sqlmap gobuster dirb wordlists curl git"
+        
+        for tool in $TOOLS; do
+            if command -v $(echo $tool | cut -d' ' -f1) &> /dev/null; then
+                echo "  ✅ $tool (already installed)"
+            else
+                echo "  📦 Installing $tool..."
+                sudo apt install -y $tool -qq > /dev/null 2>&1
+                if [ $? -eq 0 ]; then
+                    echo "  ✅ $tool installed"
+                else
+                    echo "  ⚠️  Failed to install $tool (optional)"
+                fi
+            fi
+        done
+        
+        # Check for optional tools
+        echo ""
+        echo "📥 Checking optional tools..."
+        
+        # Ffuf (may need Go)
+        if command -v ffuf &> /dev/null; then
+            echo "  ✅ ffuf (already installed)"
+        else
+            echo "  ⚠️  ffuf not found (optional - requires Go)"
+            echo "     Install: go install github.com/ffuf/ffuf@latest"
+        fi
+        
+        # Nuclei
+        if command -v nuclei &> /dev/null; then
+            echo "  ✅ nuclei (already installed)"
+        else
+            echo "  ⚠️  nuclei not found (optional)"
+            echo "     Install: go install github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest"
+        fi
+        
+        # WPScan
+        if command -v wpscan &> /dev/null; then
+            echo "  ✅ wpscan (already installed)"
+        else
+            echo "  ⚠️  wpscan not found (optional)"
+            echo "     Install: gem install wpscan"
+        fi
+        
+        # theHarvester
+        if command -v theHarvester &> /dev/null || [ -f "/usr/bin/theHarvester" ]; then
+            echo "  ✅ theHarvester (already installed)"
+        else
+            echo "  ⚠️  theHarvester not found (optional)"
+            echo "     Install: sudo apt install theharvester"
+        fi
+        
+        # Amass
+        if command -v amass &> /dev/null; then
+            echo "  ✅ amass (already installed)"
+        else
+            echo "  ⚠️  amass not found (optional)"
+            echo "     Install: go install github.com/OWASP/Amass/v3/...@master"
+        fi
+        
+    elif [ "$PKG_MANAGER" != "none" ]; then
+        echo "⚠️  Auto-installation only supports apt package manager"
+        echo "   Please install these tools manually:"
+        echo "   - nmap, nikto, sqlmap, gobuster, dirb, wordlists"
+    fi
+    
+    echo ""
+    echo "📊 Installed Tools Summary:"
+    for tool in nmap nikto sqlmap gobuster ffuf nuclei; do
+        if command -v $tool &> /dev/null; then
+            echo "  ✅ $tool - $(which $tool)"
+        else
+            echo "  ❌ $tool - not found"
+        fi
+    done
+    
+elif [ "$OS" == "mac" ]; then
+    echo ""
+    echo "==========================================="
+    echo "🛠️  macOS Tool Installation"
+    echo "==========================================="
+    echo ""
+    echo "⚠️  Please install Homebrew and run:"
+    echo "   brew install nmap nikto sqlmap gobuster"
+    echo ""
+fi
+
+echo ""
+echo "==========================================="
+echo "📦 Setting Up CyberSage Application"
+echo "==========================================="
 
 # Backend Setup
 echo ""
@@ -247,23 +402,55 @@ echo "=================================="
 echo "✅ Setup Complete!"
 echo "=================================="
 echo ""
-echo "📁 Project structure:"
-echo "   backend/venv/     - Python virtual environment"
-echo "   backend/.env      - Backend configuration"
-echo "   frontend/.env     - Frontend configuration"
+echo "📁 Project Structure:"
+echo "   backend/venv/          - Python virtual environment"
+echo "   backend/.env           - Backend configuration (add OpenRouter API key here)"
+echo "   frontend/.env          - Frontend configuration"
 echo "   frontend/node_modules/ - Node.js dependencies"
 echo ""
-echo "🚀 To start CyberSage v2.0, run:"
+echo "🛠️  Professional Tools Status:"
+if [ "$OS" == "linux" ]; then
+    CORE_TOOLS="nmap nikto sqlmap gobuster"
+    INSTALLED_COUNT=0
+    TOTAL_COUNT=0
+    for tool in $CORE_TOOLS; do
+        TOTAL_COUNT=$((TOTAL_COUNT + 1))
+        if command -v $tool &> /dev/null; then
+            INSTALLED_COUNT=$((INSTALLED_COUNT + 1))
+        fi
+    done
+    echo "   Core Tools: $INSTALLED_COUNT/$TOTAL_COUNT installed"
+    if [ $INSTALLED_COUNT -lt $TOTAL_COUNT ]; then
+        echo "   ⚠️  Some tools missing - scans will work but with reduced capabilities"
+    fi
+else
+    echo "   Please install tools manually for your OS"
+fi
+echo ""
+echo "🚀 To Start CyberSage v2.0:"
 echo "   ./start.sh"
 echo ""
-echo "📖 Quick Start:"
+echo "📖 Quick Start Guide:"
 echo "   1. Run: ./start.sh"
 echo "   2. Open: http://localhost:3000"
-echo "   3. Enter a target and click 'Start Security Scan'"
+echo "   3. Navigate to Scanner tab (🎯)"
+echo "   4. Enter target: http://testphp.vulnweb.com"
+echo "   5. Select 'Elite' mode for all tools"
+echo "   6. Click 'Start Security Scan'"
+echo "   7. Watch real-time results in Dashboard (📊)"
+echo ""
+echo "⚙️  Configuration:"
+echo "   • For AI features: Add OpenRouter API key to backend/.env"
+echo "   • Get free key at: https://openrouter.ai"
 echo ""
 echo "🔧 Troubleshooting:"
-echo "   - If backend fails: Check backend.log"
-echo "   - If frontend fails: Check frontend.log"
-echo "   - If port conflicts: Kill process on port 5000 or 3000"
+echo "   • Backend fails:    tail -f backend.log"
+echo "   • Frontend fails:   tail -f frontend.log"
+echo "   • Port conflicts:   kill -9 \$(lsof -t -i:5000) # or :3000"
+echo "   • Tools not found:  Run this script again or install manually"
 echo ""
-echo "=================================="
+echo "📚 Documentation:"
+echo "   • README.md         - Full documentation"
+echo "   • Professional tools will run automatically in Elite mode"
+echo ""
+echo "=========================================="
