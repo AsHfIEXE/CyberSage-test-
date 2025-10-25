@@ -18,6 +18,7 @@ import AIInsights from './AIInsights';
 import ImportScan from './ImportScan';
 import ScanCharts from './ScanCharts';
 import EnhancedVulnDetails from './EnhancedVulnDetails';
+import ProfessionalFormAnalysisViewer from './ProfessionalFormAnalysisViewer';
 
 const Dashboard = () => {
   const { socket, connected } = useWebSocket();
@@ -309,6 +310,11 @@ const Dashboard = () => {
             {/* Charts */}
             {currentScanId && (
               <ScanCharts scanId={currentScanId} />
+            )}
+
+            {/* Form Analysis Viewer */}
+            {currentScanId && (
+              <ProfessionalFormAnalysisViewer scanId={currentScanId} />
             )}
 
             <ScanHistory />

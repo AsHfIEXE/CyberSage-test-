@@ -1,4 +1,5 @@
 import time
+import os
 from tools.recon import ReconEngine
 from tools.vuln_scanner import VulnerabilityScanner
 from tools.advanced.chain_detector import ChainDetector
@@ -7,6 +8,7 @@ from tools.advanced.api_security import APISecurityScanner
 from tools.advanced.ai_analyzer import AIAnalyzer
 from tools.nmap_scanner import NmapScanner
 from tools.professional_tools import ProfessionalToolsIntegration
+from tools.form_discovery import EnhancedFormDiscovery, AIFormAnalyzer
 
 class ScanOrchestrator:
     """
@@ -26,6 +28,8 @@ class ScanOrchestrator:
         self.ai_analyzer = AIAnalyzer(database, broadcaster)
         self.nmap = NmapScanner(database, broadcaster)
         self.pro_tools = ProfessionalToolsIntegration(database, broadcaster)
+        self.form_discovery = EnhancedFormDiscovery(database, broadcaster)
+        self.ai_form_analyzer = AIFormAnalyzer(os.environ.get('OPENROUTER_API_KEY'))
     
     def execute_elite_scan(self, scan_id, target, scan_mode='elite', options=None, is_cancelled=None):
         """
@@ -137,35 +141,61 @@ class ScanOrchestrator:
             
             self.broadcaster.broadcast_scan_progress(scan_id, 20, "✓ Reconnaissance Complete")
             
-            # Phase 2: Vulnerability Scanning (20-50%)
+            # Phase 2: Form Discovery (20-40%)
+            if scan_mode in ['standard', 'elite']:
+                if is_cancelled and is_cancelled():
+                    return self._cancelled_result(scan_id)
+                
+                self.broadcaster.broadcast_scan_progress(scan_id, 35, "🔍 Discovering Forms")
+                discovered_forms = self.form_discovery.discover_forms(
+                    scan_id, target, recon_data.get('endpoints', [])
+                )
+                
+                # AI Analysis for forms (elite mode only)
+                if scan_mode == 'elite' and discovered_forms:
+                    if is_cancelled and is_cancelled():
+                        return self._cancelled_result(scan_id)
+                    
+                    self.broadcaster.broadcast_scan_progress(scan_id, 38, "🤖 AI Form Analysis")
+                    for form in discovered_forms[:5]:  # Analyze top 5 forms
+                        try:
+                            ai_analysis = self.ai_form_analyzer.analyze_form_security(form)
+                            # Store AI analysis
+                            form['ai_analysis'] = ai_analysis
+                        except Exception as e:
+                            print(f"[WARNING] AI form analysis failed: {e}")
+                
+                self.broadcaster.broadcast_scan_progress(scan_id, 40, "✓ Form Discovery Complete")
+            
+            # Phase 3: Vulnerability Scanning (40-60%)
             if is_cancelled and is_cancelled():
                 return self._cancelled_result(scan_id)
             
-            self.broadcaster.broadcast_scan_progress(scan_id, 25, "🔥 Initiating Vulnerability Scans")
+            self.broadcaster.broadcast_scan_progress(scan_id, 45, "🔥 Initiating Vulnerability Scans")
             vulns = self.vuln_scanner.comprehensive_scan(scan_id, recon_data)
             all_vulnerabilities.extend(vulns)
             
-            self.broadcaster.broadcast_scan_progress(scan_id, 50, "✓ Vulnerability Scanning Complete")
+            self.broadcaster.broadcast_scan_progress(scan_id, 60, "✓ Vulnerability Scanning Complete")
             
-            # Phase 3: Advanced Detection (50-70%)
+            # Phase 4: Advanced Detection (60-75%)
             if scan_mode == 'elite':
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
                 
-                self.broadcaster.broadcast_scan_progress(scan_id, 55, "🧩 Analyzing Business Logic")
+                self.broadcaster.broadcast_scan_progress(scan_id, 65, "🧩 Analyzing Business Logic")
                 business_vulns = self.business_logic.scan(scan_id, recon_data)
                 all_vulnerabilities.extend(business_vulns)
                 
                 if recon_data.get('has_api'):
                     if is_cancelled and is_cancelled():
                         return self._cancelled_result(scan_id)
-                    self.broadcaster.broadcast_scan_progress(scan_id, 60, "🔌 Testing API Security")
+                    self.broadcaster.broadcast_scan_progress(scan_id, 70, "🔌 Testing API Security")
                     api_vulns = self.api_security.scan(scan_id, recon_data)
                     all_vulnerabilities.extend(api_vulns)
                 
-                self.broadcaster.broadcast_scan_progress(scan_id, 70, "✓ Advanced Detection Complete")
+                self.broadcaster.broadcast_scan_progress(scan_id, 75, "✓ Advanced Detection Complete")
             
-            # Phase 4: Chain Detection (70-85%)
+            # Phase 5: Chain Detection (75-85%)
             if is_cancelled and is_cancelled():
                 return self._cancelled_result(scan_id)
             
@@ -178,7 +208,7 @@ class ScanOrchestrator:
             
             self.broadcaster.broadcast_scan_progress(scan_id, 85, "✓ Chain Analysis Complete")
             
-            # Phase 5: AI Analysis (85-95%)
+            # Phase 6: AI Analysis (85-95%)
             if scan_mode == 'elite':
                 if is_cancelled and is_cancelled():
                     return self._cancelled_result(scan_id)
@@ -195,7 +225,7 @@ class ScanOrchestrator:
                 
                 self.broadcaster.broadcast_scan_progress(scan_id, 95, "✓ AI Analysis Complete")
             
-            # Phase 6: Finalization (95-100%)
+            # Phase 7: Finalization (95-100%)
             self.broadcaster.broadcast_scan_progress(scan_id, 98, "📊 Generating Final Report")
             
             stats = self._calculate_final_stats(all_vulnerabilities, all_chains)

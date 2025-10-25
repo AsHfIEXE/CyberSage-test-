@@ -168,6 +168,24 @@ class Database:
                 )
             ''')
             
+            # Discovered forms table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS discovered_forms (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scan_id TEXT NOT NULL,
+                    page_url TEXT,
+                    form_index INTEGER,
+                    action TEXT,
+                    method TEXT,
+                    form_purpose TEXT,
+                    fields_json TEXT,
+                    security_analysis_json TEXT,
+                    ai_analysis_json TEXT,
+                    discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (scan_id) REFERENCES scans(scan_id)
+                )
+            ''')
+            
             print("[Database] Enhanced schema initialized successfully")
     
     def create_scan(self, scan_id, target, scan_mode):
@@ -444,3 +462,44 @@ class Database:
             stats['attack_chains'] = chain_row['chain_count'] if chain_row else 0
             
             return stats
+    
+    def add_form(self, scan_id, form_data):
+        """Store discovered form"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO discovered_forms 
+                (scan_id, page_url, form_index, action, method, form_purpose, 
+                 fields_json, security_analysis_json, ai_analysis_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                scan_id,
+                form_data.get('page_url'),
+                form_data.get('form_index'),
+                form_data.get('action'),
+                form_data.get('method'),
+                form_data.get('form_purpose'),
+                json.dumps(form_data.get('fields', [])),
+                json.dumps(form_data.get('security_analysis', {})),
+                json.dumps(form_data.get('ai_analysis', {})) if form_data.get('ai_analysis') else None
+            ))
+            return cursor.lastrowid
+    
+    def get_forms_by_scan(self, scan_id):
+        """Get all forms for a scan"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM discovered_forms WHERE scan_id = ?
+            ''', (scan_id,))
+            
+            forms = []
+            for row in cursor.fetchall():
+                form = dict(row)
+                form['fields'] = json.loads(form['fields_json']) if form.get('fields_json') else []
+                form['security_analysis'] = json.loads(form['security_analysis_json']) if form.get('security_analysis_json') else {}
+                if form.get('ai_analysis_json'):
+                    form['ai_analysis'] = json.loads(form['ai_analysis_json'])
+                forms.append(form)
+            
+            return forms

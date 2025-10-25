@@ -243,6 +243,35 @@ def get_vulnerability_details(vuln_id):
     vuln = db.get_vulnerability_details(vuln_id)
     return jsonify({"vulnerability": vuln})
 
+@app.route('/api/scan/<scan_id>/forms', methods=['GET'])
+def get_scan_forms(scan_id):
+    """Get all discovered forms for a scan"""
+    forms = db.get_forms_by_scan(scan_id)
+    return jsonify({'forms': forms})
+
+@app.route('/api/forms/analyze', methods=['POST'])
+def analyze_form():
+    """Get AI analysis for a specific form"""
+    from tools.form_discovery import AIFormAnalyzer
+    
+    data = request.get_json()
+    form_data = data.get('form_data')
+    
+    if not form_data:
+        return jsonify({"error": "form_data is required"}), 400
+    
+    api_key = os.environ.get('OPENROUTER_API_KEY')
+    if not api_key:
+        return jsonify({"error": "OpenRouter API key not configured"}), 500
+    
+    analyzer = AIFormAnalyzer(api_key)
+    
+    try:
+        analysis = analyzer.analyze_form_security(form_data)
+        return jsonify(analysis)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/repeater/send', methods=['POST'])
 def repeater_send():
     """Send HTTP request via Repeater"""
