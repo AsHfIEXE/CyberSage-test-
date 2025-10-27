@@ -3,6 +3,13 @@ Enhanced Vulnerability Scanner for CyberSage v2.0
 Professional-grade vulnerability detection with detailed evidence collection
 """
 
+from tools.crawler import WebCrawler
+from tools.fuzzer import ParameterFuzzer
+from tools.payload_generator import PayloadGenerator
+from tools.confidence_scorer import ConfidenceScorer
+from tools.enhanced_vuln_scanner import EnhancedVulnerabilityScanner
+from tools.vulnerability_detectors import AdditionalVulnerabilityDetectors
+from tools.security_header_scanner import SecurityHeaderScanner
 import requests
 import re
 import time
@@ -21,11 +28,21 @@ class VulnerabilityScanner:
     Enhanced with retry logic, timeout handling, and comprehensive error management
     """
     
-    def __init__(self, database, broadcaster):
-        self.db = database
+    def __init__(self, broadcaster=None):
         self.broadcaster = broadcaster
+        self.crawler = WebCrawler()
+        self.fuzzer = ParameterFuzzer()
+        self.payload_gen = PayloadGenerator()
+        self.confidence_scorer = ConfidenceScorer()
+        
+        # Initialize enhanced scanners
+        self.enhanced_scanner = EnhancedVulnerabilityScanner(broadcaster)
+        self.additional_detectors = AdditionalVulnerabilityDetectors()
+        self.security_scanner = SecurityHeaderScanner()
+        
+        self.vulnerabilities = []
+        self.scanned_urls = set()
         self.session = requests.Session()
-        self.session.verify = False
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 CyberSage/2.0'
         })
@@ -140,6 +157,112 @@ class VulnerabilityScanner:
                 self.broadcaster.broadcast_tool_completed(scan_id, 'Sensitive File Scanner', 'success', len(file_vulns))
             except Exception as e:
                 self.broadcaster.broadcast_log(scan_id, f"[ERROR] Sensitive file scan failed: {str(e)}", 'error')
+            
+            # Phase 9: Enhanced Vulnerability Detection (100+ patterns)
+            self.broadcaster.broadcast_tool_started(scan_id, 'Enhanced Scanner (100+ Patterns)', target)
+            try:
+                # Run enhanced scanner on all discovered endpoints
+                for endpoint in discovered_endpoints[:50]:  # Limit to 50 endpoints for performance
+                    enhanced_vulns = self.enhanced_scanner.scan_url(endpoint['url'])
+                    all_vulnerabilities.extend(enhanced_vulns)
+                self.broadcaster.broadcast_tool_completed(scan_id, 'Enhanced Scanner', 'success', len(enhanced_vulns))
+            except Exception as e:
+                self.broadcaster.broadcast_log(scan_id, f"[ERROR] Enhanced scan failed: {str(e)}", 'error')
+            
+            # Phase 10: Additional Vulnerability Detectors
+            self.broadcaster.broadcast_tool_started(scan_id, 'Advanced Detectors (XXE, SSRF, LDAP, etc)', target)
+            try:
+                for endpoint in discovered_endpoints[:30]:  # Test subset of endpoints
+                    parsed = urlparse(endpoint['url'])
+                    params = parse_qs(parsed.query)
+                    
+                    for param_name, param_values in params.items():
+                        param_value = param_values[0] if param_values else ''
+                        
+                        # Path Traversal
+                        path_vulns = self.additional_detectors.detect_path_traversal(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(path_vulns)
+                        
+                        # SSRF
+                        ssrf_vulns = self.additional_detectors.detect_ssrf(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(ssrf_vulns)
+                        
+                        # LDAP Injection
+                        ldap_vulns = self.additional_detectors.detect_ldap_injection(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(ldap_vulns)
+                        
+                        # XPath Injection
+                        xpath_vulns = self.additional_detectors.detect_xpath_injection(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(xpath_vulns)
+                        
+                        # NoSQL Injection
+                        nosql_vulns = self.additional_detectors.detect_nosql_injection(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(nosql_vulns)
+                        
+                        # Template Injection
+                        template_vulns = self.additional_detectors.detect_template_injection(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(template_vulns)
+                        
+                        # CRLF Injection
+                        crlf_vulns = self.additional_detectors.detect_crlf_injection(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(crlf_vulns)
+                        
+                        # Open Redirect
+                        redirect_vulns = self.additional_detectors.detect_open_redirect(endpoint['url'], param_name, param_value)
+                        all_vulnerabilities.extend(redirect_vulns)
+                
+                # XXE Injection (POST endpoints)
+                for endpoint in discovered_endpoints:
+                    if endpoint.get('method') == 'POST':
+                        xxe_vulns = self.additional_detectors.detect_xxe_injection(endpoint['url'])
+                        all_vulnerabilities.extend(xxe_vulns)
+                
+                # Host Header Injection
+                host_vulns = self.additional_detectors.detect_host_header_injection(target)
+                all_vulnerabilities.extend(host_vulns)
+                
+                self.broadcaster.broadcast_tool_completed(scan_id, 'Advanced Detectors', 'success', len(all_vulnerabilities))
+            except Exception as e:
+                self.broadcaster.broadcast_log(scan_id, f"[ERROR] Advanced detectors failed: {str(e)}", 'error')
+            
+            # Phase 11: Security Configuration Checks
+            self.broadcaster.broadcast_tool_started(scan_id, 'Security Configuration Scanner', target)
+            try:
+                # Security Headers
+                header_vulns = self.security_scanner.detect_security_headers(target)
+                all_vulnerabilities.extend(header_vulns)
+                
+                # CORS Misconfiguration
+                cors_vulns = self.security_scanner.detect_cors_misconfiguration(target)
+                all_vulnerabilities.extend(cors_vulns)
+                
+                # Clickjacking
+                clickjack_vulns = self.security_scanner.detect_clickjacking(target)
+                all_vulnerabilities.extend(clickjack_vulns)
+                
+                # SSL/TLS Vulnerabilities
+                ssl_vulns = self.security_scanner.detect_weak_ssl(target)
+                all_vulnerabilities.extend(ssl_vulns)
+                
+                # Information Disclosure
+                info_vulns = self.security_scanner.detect_information_disclosure(target)
+                all_vulnerabilities.extend(info_vulns)
+                
+                # Subdomain Takeover
+                subdomain_vulns = self.security_scanner.detect_subdomain_takeover(target)
+                all_vulnerabilities.extend(subdomain_vulns)
+                
+                # API Key Detection
+                api_vulns = self.security_scanner.detect_api_keys(target)
+                all_vulnerabilities.extend(api_vulns)
+                
+                # JWT Vulnerabilities
+                jwt_vulns = self.security_scanner.detect_jwt_vulnerabilities(target)
+                all_vulnerabilities.extend(jwt_vulns)
+                
+                self.broadcaster.broadcast_tool_completed(scan_id, 'Security Configuration', 'success', len(header_vulns) + len(cors_vulns))
+            except Exception as e:
+                self.broadcaster.broadcast_log(scan_id, f"[ERROR] Security configuration scan failed: {str(e)}", 'error')
                 self._log_error(scan_id, 'Sensitive Files', str(e))
         
             # Save all vulnerabilities and link HTTP evidence

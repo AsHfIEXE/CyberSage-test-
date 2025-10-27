@@ -6,6 +6,7 @@ const ModernNavigation = ({ currentPage, setCurrentPage, stats, scanStatus }) =>
     { id: 'dashboard', label: 'Dashboard', icon: '📊', desc: 'Overview & Stats' },
     { id: 'scanner', label: 'Scanner', icon: '🎯', desc: 'Start New Scan' },
     { id: 'vulnerabilities', label: 'Vulnerabilities', icon: '⚠️', desc: 'View Findings', badge: stats.critical + stats.high + stats.medium + stats.low },
+    { id: 'repeater', label: 'Repeater', icon: '🔄', desc: 'HTTP Testing' },
     { id: 'chains', label: 'Attack Chains', icon: '⛓️', desc: 'Linked Vulns' },
     { id: 'tools', label: 'Tools', icon: '🛠️', desc: 'Pro Tools' },
   ];

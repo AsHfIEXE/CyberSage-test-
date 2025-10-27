@@ -13,6 +13,7 @@ from core.scan_orchestrator import ScanOrchestrator
 from core.realtime_broadcaster import RealTimeBroadcaster
 from core.pdf_generator import PDFReportGenerator
 from tools.integrations import ThirdPartyScannerIntegration
+from api.repeater import repeater_bp
 
 # Create Flask app
 app = Flask(__name__)
@@ -466,6 +467,9 @@ def handle_stop_scan(data):
         print(f'[Scan] Stopped scan {scan_id}')
     else:
         emit('error', {'message': 'Scan not found or already completed'})
+
+# Register blueprints
+app.register_blueprint(repeater_bp)
 
 # ============================================================================
 # MAIN

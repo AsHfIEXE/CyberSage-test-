@@ -5,6 +5,7 @@ import RealTimeLogs from './components/RealTimeLogs';
 import ScanControlPanel from './components/ScanControlPanel';
 import ModernNavigation from './components/ModernNavigation';
 import StatsCard from './components/StatsCard';
+import HttpRepeater from './components/HttpRepeater';
 
 // ============================================================================
 // MAIN APP WITH PROPER NAVIGATION
@@ -137,7 +138,7 @@ const CyberSageApp = () => {
       case 'chains':
         return <ChainsPage chains={chains} />;
       case 'repeater':
-        return <RepeaterPage httpHistory={httpHistory} setHttpHistory={setHttpHistory} />;
+        return <HttpRepeater />;
       case 'history':
         return <HistoryPage />;
       case 'blueprint':
@@ -158,6 +159,8 @@ const CyberSageApp = () => {
           aiInsights={aiInsights}
           toolActivity={toolActivity}
           socket={socket}
+          persistentLogs={persistentLogs}
+          setPersistentLogs={setPersistentLogs}
         />;
     }
   };
@@ -189,7 +192,7 @@ const CyberSageApp = () => {
 // ============================================================================
 // DASHBOARD PAGE
 // ============================================================================
-const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPhase, chains, currentScanId, aiInsights, toolActivity, socket }) => (
+const DashboardPage = ({ stats, vulnerabilities, scanStatus, progress, currentPhase, chains, currentScanId, aiInsights, toolActivity, socket, persistentLogs, setPersistentLogs }) => (
   <div className="space-y-6">
     <div className="flex items-center justify-between">
       <h2 className="text-3xl font-bold">Security Dashboard</h2>
