@@ -28,7 +28,8 @@ class VulnerabilityScanner:
     Enhanced with retry logic, timeout handling, and comprehensive error management
     """
     
-    def __init__(self, broadcaster=None):
+    def __init__(self, database=None, broadcaster=None):
+        self.db = database
         self.broadcaster = broadcaster
         self.crawler = WebCrawler()
         self.fuzzer = ParameterFuzzer()

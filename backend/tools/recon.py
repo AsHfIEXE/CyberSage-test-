@@ -3,7 +3,7 @@ import json
 import time
 import requests
 from urllib.parse import urlparse, urljoin
-from .ajax_spider import AjaxSpider
+# Ajax spider removed - functionality integrated into main scanner
 
 class ReconEngine:
     """
@@ -13,7 +13,7 @@ class ReconEngine:
     def __init__(self, database, broadcaster):
         self.db = database
         self.broadcaster = broadcaster
-        self.ajax_spider = AjaxSpider(database, broadcaster)
+        # Ajax spider functionality integrated into main scanner
     
     def deep_reconnaissance(self, scan_id, target, options=None):
         """
@@ -56,10 +56,8 @@ class ReconEngine:
         self.broadcaster.broadcast_tool_started(scan_id, 'Endpoint Crawling', target)
         endpoints, blueprint = self._discover_endpoints(scan_id, target)
         
-        # AJAX-aware crawling for JavaScript-heavy applications
-        self.broadcaster.broadcast_tool_started(scan_id, 'AJAX Spider', target)
-        ajax_endpoints = self.ajax_spider.crawl_ajax_aware(scan_id, target, max_depth=2, max_pages=30)
-        endpoints.extend(ajax_endpoints)
+        # AJAX crawling functionality has been integrated into the main crawler
+        # Additional endpoints will be discovered during vulnerability scanning
         
         # Remove duplicates and update
         recon_data['endpoints'] = list(set(endpoints))
