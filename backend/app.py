@@ -19,12 +19,13 @@ from api.repeater import repeater_bp
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'cybersage_v2_elite_secret_2024')
 
-# Enable CORS
+# Enable CORS for all routes
 CORS(app, resources={
     r"/*": {
-        "origins": "*",
+        "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001", "*"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": True
     }
 })
 
@@ -32,13 +33,15 @@ CORS(app, resources={
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
+    cors_credentials=False,
     async_mode='threading',
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
     ping_interval=25,
     allow_upgrades=True,
-    transports=['polling', 'websocket']
+    transports=['websocket', 'polling'],  # Try websocket first
+    namespaces=['/scan']
 )
 
 # Initialize components
@@ -334,23 +337,41 @@ def repeater_send():
 def handle_connect():
     """Handle client connection"""
     print(f'✅ [WebSocket] Client connected: {request.sid}')
+    print(f'   Namespace: {request.namespace}')
+    print(f'   Remote Address: {request.remote_addr}')
+    print(f'   User Agent: {request.headers.get("User-Agent", "Unknown")}')
     emit('connected', {
         'status': 'ready',
         'message': 'Connected to CyberSage v2.0',
         'server_time': time.time(),
         'version': '2.0',
-        'ai_enabled': bool(os.environ.get('OPENROUTER_API_KEY'))
+        'ai_enabled': bool(os.environ.get('OPENROUTER_API_KEY')),
+        'socket_id': request.sid
     })
 
 @socketio.on('disconnect', namespace='/scan')
 def handle_disconnect():
     """Handle client disconnection"""
     print(f'❌ [WebSocket] Client disconnected: {request.sid}')
+    print(f'   Namespace: {request.namespace}')
+    print(f'   Remote Address: {request.remote_addr}')
 
 @socketio.on('ping', namespace='/scan')
 def handle_ping():
     """Handle ping from client"""
-    emit('pong', {'timestamp': time.time()})
+    print(f'🏓 [WebSocket] Ping received from {request.sid}')
+    emit('pong', {'timestamp': time.time(), 'server': 'CyberSage v2.0'})
+
+@socketio.on('test_connection', namespace='/scan')
+def handle_test_connection(data):
+    """Handle test connection from client"""
+    print(f'🧪 [WebSocket] Test connection received from {request.sid}:', data)
+    emit('test_response', {
+        'status': 'success',
+        'message': 'Test connection successful',
+        'timestamp': time.time(),
+        'data': data
+    })
 
 @socketio.on('start_scan', namespace='/scan')
 def handle_start_scan(data):

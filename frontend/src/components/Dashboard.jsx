@@ -21,7 +21,7 @@ import EnhancedVulnDetails from './EnhancedVulnDetails';
 import ProfessionalFormAnalysisViewer from './ProfessionalFormAnalysisViewer';
 
 const Dashboard = () => {
-  const { socket, connected } = useWebSocket();
+  const { socket, connected, connectionInfo, debugInfo } = useWebSocket();
   const [scanStatus, setScanStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [currentPhase, setCurrentPhase] = useState('');
@@ -257,16 +257,72 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Connection Warning */}
-        {!connected && (
-          <div className="mb-8 bg-red-900/30 border border-red-500 rounded-lg p-4">
-            <p className="text-red-400 font-medium">
-              ⚠️ Not connected to backend. Make sure the backend is running on http://localhost:5000
-            </p>
-          </div>
-        )}
+        {/* WebSocket Debug Panel */}
+        <div className="mb-8 bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-200 mb-3">🔧 WebSocket Debug Panel</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Connection Status */}
+            <div className="bg-gray-900/50 rounded p-3">
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Connection Status</h4>
+              <div className={`flex items-center space-x-2 mb-2 ${connected ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm">{connected ? 'Connected' : 'Disconnected'}</span>
+              </div>
+              {connectionInfo && (
+                <div className="text-xs text-gray-400 space-y-1">
+                  <div>Backend URL: {connectionInfo.backendUrl}</div>
+                  <div>Socket ID: {connectionInfo.id || 'None'}</div>
+                  <div>Transport: {connectionInfo.transport || 'None'}</div>
+                  <div>State: {connectionInfo.state || 'Unknown'}</div>
+                </div>
+              )}
+            </div>
 
-        {/* Scan Control */}
+            {/* Debug Logs */}
+            <div className="bg-gray-900/50 rounded p-3">
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Recent Events</h4>
+              <div className="text-xs text-gray-400 space-y-1 max-h-32 overflow-y-auto">
+                {debugInfo && debugInfo.length > 0 ? (
+                  debugInfo.map((log, index) => (
+                    <div key={index} className="flex">
+                      <span className="text-gray-500 mr-2">[{log.type}]</span>
+                      <span className="text-gray-300">{log.message}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-gray-500">No events yet...</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Debug Actions */}
+          <div className="mt-3 pt-3 border-t border-gray-700">
+            <div className="flex space-x-2">
+              <button
+                onClick={() => socket?.emit('ping')}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+              >
+                Send Ping
+              </button>
+              <button
+                onClick={() => socket?.emit('test_connection', { test: 'debug panel' })}
+                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded transition-colors"
+              >
+                Test Connection
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Connection Info:', connectionInfo);
+                  console.log('Debug Logs:', debugInfo);
+                }}
+                className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors"
+              >
+                Log to Console
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="mb-8">
           <ScanControl
             onStartScan={startScan}
