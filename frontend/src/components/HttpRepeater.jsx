@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { saveAs } from 'file-saver';
 
 const HttpRepeater = () => {
@@ -21,16 +21,16 @@ const HttpRepeater = () => {
   const [responseFormat, setResponseFormat] = useState('pretty');
   const [history, setHistory] = useState([]);
   const [collections, setCollections] = useState([]);
-  const [selectedCollection, setSelectedCollection] = useState(null);
-  const [environment, setEnvironment] = useState('dev');
-  const [envVariables, setEnvVariables] = useState({
-    dev: { baseUrl: 'http://localhost:3000', token: '' },
-    staging: { baseUrl: 'https://staging.example.com', token: '' },
-    prod: { baseUrl: 'https://api.example.com', token: '' }
-  });
+  // const [selectedCollection, setSelectedCollection] = useState(null);
+  // const [environment, setEnvironment] = useState('dev');
+  // const [envVariables, setEnvVariables] = useState({
+  //   dev: { baseUrl: 'http://localhost:3000', token: '' },
+  //   staging: { baseUrl: 'https://staging.example.com', token: '' },
+  //   prod: { baseUrl: 'https://api.example.com', token: '' }
+  // });
   
   // Refs
-  const requestEditorRef = useRef(null);
+  // const requestEditorRef = useRef(null);
   
   // Methods array
   const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -56,17 +56,22 @@ const HttpRepeater = () => {
   };
   
   // Replace environment variables in text
-  const replaceEnvVariables = (text) => {
-    const vars = envVariables[environment];
+  const replaceEnvVariables = useCallback((text) => {
+    // const vars = envVariables[environment];
+    const vars = {
+      dev: { baseUrl: 'http://localhost:3000', token: '' },
+      staging: { baseUrl: 'https://staging.example.com', token: '' },
+      prod: { baseUrl: 'https://api.example.com', token: '' }
+    };
     let result = text;
     Object.keys(vars).forEach(key => {
       result = result.replace(new RegExp(`{{${key}}}`, 'g'), vars[key]);
     });
     return result;
-  };
+  }, []);
   
   // Send Request
-  const sendRequest = async () => {
+  const sendRequest = useCallback(async () => {
     const startTime = Date.now();
     setLoading(true);
     setResponse(null);
@@ -148,7 +153,7 @@ const HttpRepeater = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [url, method, headers, body, bodyType, replaceEnvVariables]);
   
   // Keyboard shortcut
   useEffect(() => {
@@ -159,7 +164,7 @@ const HttpRepeater = () => {
     };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [url, method, headers, body]);
+  }, [sendRequest]);
   
   // Add/Remove headers
   const addHeader = () => {
@@ -322,7 +327,8 @@ const HttpRepeater = () => {
           {/* Top Bar */}
           <div className="bg-gray-900 border-b border-gray-800 p-4">
             <div className="flex items-center space-x-4">
-              {/* Environment Selector */}
+              {/* Environment Selector - Temporarily commented out */}
+              {/*
               <select
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value)}
@@ -332,6 +338,7 @@ const HttpRepeater = () => {
                 <option value="staging">Staging</option>
                 <option value="prod">Production</option>
               </select>
+              */}
               
               {/* Method Selector */}
               <select

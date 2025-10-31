@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
+import { useScan } from '../context/EnhancedScanContext';
 
-const ScanControlPanel = ({ socket, scanId, scanStatus, progress, currentPhase, onPause, onResume, onStop }) => {
+const ScanControlPanel = ({ scanId, scanStatus, progress, currentPhase }) => {
+  const { actions } = useScan();
   const [isPaused, setIsPaused] = useState(false);
 
   const handlePause = () => {
     setIsPaused(true);
-    if (onPause) onPause();
+    actions.pauseScan();
   };
 
   const handleResume = () => {
     setIsPaused(false);
-    if (onResume) onResume();
+    actions.resumeScan();
   };
 
   const handleStop = () => {
-    if (socket && scanId) {
-      socket.emit('stop_scan', { scan_id: scanId });
-    }
-    if (onStop) onStop();
+    actions.stopScan();
   };
 
   const getStatusColor = () => {

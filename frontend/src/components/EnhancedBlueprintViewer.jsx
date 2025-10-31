@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const EnhancedBlueprintViewer = ({ scanId }) => {
   const [blueprint, setBlueprint] = useState(null);
@@ -9,13 +9,7 @@ const EnhancedBlueprintViewer = ({ scanId }) => {
   
   const backendUrl = process.env.REACT_APP_BACKEND_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
-  useEffect(() => {
-    if (scanId) {
-      loadBlueprint();
-    }
-  }, [scanId]);
-
-  const loadBlueprint = async () => {
+  const loadBlueprint = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`${backendUrl}/api/scan/${scanId}/blueprint`);
@@ -26,7 +20,13 @@ const EnhancedBlueprintViewer = ({ scanId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [backendUrl, scanId]);
+
+  useEffect(() => {
+    if (scanId) {
+      loadBlueprint();
+    }
+  }, [scanId, loadBlueprint]);
 
   if (!scanId) {
     return (
