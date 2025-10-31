@@ -68,13 +68,17 @@ def index():
         "websocket": "enabled"
     })
 
-@app.route('/api/health')
-def health():
+@app.route('/api/websocket/health')
+def websocket_health():
+    """Check WebSocket health and connection info"""
     return jsonify({
         "status": "healthy",
-        "active_scans": len(active_scans),
-        "database": "connected",
-        "websocket": "enabled"
+        "websocket": "enabled",
+        "namespace": "/scan",
+        "transports": ["websocket", "polling"],
+        "active_connections": len(socketio.server.manager.get_participants('/', '/scan')),
+        "server_time": time.time(),
+        "version": "2.0"
     })
 
 @app.route('/api/config', methods=['GET'])
